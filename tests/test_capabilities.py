@@ -132,6 +132,7 @@ def test_compaction_preserves_records_usage_and_restored_request_context(isolate
         original_messages = [(item['id'], item['content']) for item in before['messages']]
         assert before['usage']['session']['request_count'] == 3
 
+        action(client, identity, 'effort', effort='high')
         action(client, identity, 'compact')
         compacted = complete(client, identity)
         assert compacted['status'] == 'completed', compacted.get('result')
@@ -142,7 +143,7 @@ def test_compaction_preserves_records_usage_and_restored_request_context(isolate
         assert len(provider.compaction_requests) == 1
         outgoing = provider.compaction_requests[0]
         assert outgoing.purpose == 'compaction' and outgoing.tools == [] and not outgoing.allow_tool_calls
-        assert outgoing.thinking is None
+        assert outgoing.reasoning_effort == 'high' and outgoing.api_mode == 'chat_completions_legacy'
         assert compacted['usage']['session']['request_count'] == 4
         assert compacted['usage']['session']['input_tokens'] == 150311
         assert compacted['usage']['session']['output_tokens'] == 36

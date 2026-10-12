@@ -4,7 +4,7 @@ export type DraftChats=Record<string,ChatSummary>;
 export function draftSummary(chat:ChatSummary):ChatSummary{
   return {id:chat.id.toLowerCase(),project_id:chat.project_id,title:chat.title||'新聊天',
     draft:true,status:chat.status||'idle',phase:chat.phase||'execute',access:chat.access||'project',
-    model_ref:chat.model_ref||'',sdk_session_id:chat.sdk_session_id,updated_at:chat.updated_at,
+    model_ref:chat.model_ref||'',reasoning_effort:chat.reasoning_effort||'auto',effort_levels:chat.effort_levels,effort_known:chat.effort_known,sdk_session_id:chat.sdk_session_id,updated_at:chat.updated_at,
     pending_config:chat.pending_config,_event_sequence:chat._event_sequence};
 }
 export function restoreDraftChats(value:unknown):DraftChats{
@@ -20,6 +20,7 @@ export function restoreDraftChats(value:unknown):DraftChats{
 export function draftCreatePayload(chat:ChatSummary){
   return {project_id:chat.project_id,draft_id:chat.id,title:chat.title,
     ...(chat.model_ref?{model_ref:chat.model_ref}:{}),
+    reasoning_effort:chat.reasoning_effort||'auto',
     ...(['discuss','plan','execute'].includes(chat.phase)?{phase:chat.phase}:{}),
     ...(['project','full'].includes(chat.access)?{access:chat.access}:{})};
 }

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI,Query,Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse,JSONResponse,StreamingResponse,HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel,ConfigDict,Field,field_validator
@@ -16,6 +17,7 @@ from .manager import AppManager,WebError
 from .commands import complete,execute,definitions
 from .files import list_files,read_file
 from .native_dialog import pick_directory
+from .discovery import DiscoveryService
 
 
 class Body(BaseModel):
@@ -32,6 +34,22 @@ class ChatBody(Body):
     draft_id:str|None=Field(default=None,pattern=r'^[0-9a-fA-F]{32}$')
     phase:Literal['discuss','plan','execute']|None=None
     access:Literal['project','full']|None=None
+    reasoning_effort:str|None=Field(default=None,min_length=1,max_length=64)
+
+class DiscoveryBody(Body):
+    provider_id:str=Field(min_length=1,max_length=150)
+    provider:dict
+    revision:str=Field(min_length=1,max_length=128)
+    project_id:str|None=None
+    refresh:bool=False
+
+class DiscoveryMergeBody(Body):
+    provider_id:str=Field(min_length=1,max_length=150)
+    provider:dict
+    revision:str=Field(min_length=1,max_length=128)
+    project_id:str|None=None
+    discovery_id:str=Field(pattern=r'^[0-9a-f]{32}$')
+    selected_ids:list[str]=Field(max_length=10000)
 
 class TurnBody(Body):
     prompt:str=Field(min_length=1,max_length=20000)
@@ -61,6 +79,7 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
         manager=AppManager(root,user_home=user_home,provider_factory=provider_factory,enable_mcp=enable_mcp)
         manager.shutdown_callback=getattr(app.state,'shutdown_callback',None)
         app.state.manager=manager
+        app.state.discovery=DiscoveryService(manager.configuration)
         await manager.start()
         try:yield
         finally:await manager.close()
@@ -82,6 +101,11 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
         response.headers['Referrer-Policy']='no-referrer'
         response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
         return response
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request,exc):
+        # Pydantic 默认错误包含完整 input；含凭据的设置正文不能被错误回显。
+        return JSONResponse({'detail':'请求参数格式无效，请检查必填项和选项。'},status_code=422)
 
     @app.exception_handler(WebError)
     @app.exception_handler(Exception)
@@ -132,7 +156,7 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
         return manager(request).preview_project_file(project_id,path)
 
     @app.post('/api/chats',status_code=201)
-    async def chat(body:ChatBody,request:Request):return await manager(request).create_chat(body.project_id,body.title,body.model_ref,draft_id=body.draft_id,phase=body.phase,access=body.access)
+    async def chat(body:ChatBody,request:Request):return await manager(request).create_chat(body.project_id,body.title,body.model_ref,draft_id=body.draft_id,phase=body.phase,access=body.access,reasoning_effort=body.reasoning_effort)
 
     @app.get('/api/chats/{chat_id}')
     async def detail(chat_id:str,request:Request,before:int|None=Query(None,ge=0),limit:int=Query(50,ge=1,le=100)):
@@ -193,6 +217,17 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
 
     @app.patch('/api/settings')
     async def save(body:dict,request:Request):return await manager(request).save_settings(body)
+
+    def discovery_project(request:Request,project_id:str|None):
+        return Path(manager(request).get_project(project_id)['path']) if project_id else None
+
+    @app.post('/api/settings/model-discovery')
+    async def discover_models(body:DiscoveryBody,request:Request):
+        return await request.app.state.discovery.discover(body.model_dump(),discovery_project(request,body.project_id))
+
+    @app.post('/api/settings/model-discovery/merge')
+    async def merge_models(body:DiscoveryMergeBody,request:Request):
+        return request.app.state.discovery.merge(body.model_dump(),discovery_project(request,body.project_id))
 
     @app.get('/api/events')
     async def events(request:Request,after:int=Query(0,ge=0)):

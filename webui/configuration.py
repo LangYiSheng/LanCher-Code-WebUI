@@ -5,19 +5,23 @@ from copy import deepcopy
 from dataclasses import asdict
 import hashlib
 import json
+import re
 from pathlib import Path
 import threading
 
 import yaml
 
-from lancher_code.config.loader import load_config, load_config_data
+from lancher_code.config.loader import load_config, load_config_data, _load_provider
+from lancher_code.config.models import AppConfig
 from lancher_code.config.paths import (
     get_global_config_path, get_global_mcp_config_path, get_global_permissions_path,
     get_project_mcp_config_path, get_project_permissions_path,
 )
 from lancher_code.config.settings import SettingsService, SettingsError
 from lancher_code.config.writer import serialize_config, write_yaml_atomic
-from lancher_code.errors import ConfigError
+from lancher_code.errors import ConfigError, ProviderError, ProviderAuthError
+from lancher_code.providers.discovery import ModelDiscoveryClient, ModelDiscoveryResult, discovery_connection
+from lancher_code.providers.metadata import connection_fingerprint
 from lancher_code.mcp.config import load_mcp_config
 from lancher_code.permissions.models import PermissionRule
 from lancher_code.permissions.storage import PermissionStorage
@@ -67,6 +71,12 @@ def _public_models(config: dict) -> dict:
                 if "api_key" in model:
                     model["api_key"] = ""
     return result
+
+
+def public_provider(provider) -> dict:
+    """沿用 SDK 序列化以保留缺省继承，只公开不含密钥的模型草稿。"""
+    config = serialize_config(AppConfig(providers={'provider': provider}, default_model='provider/preview'))
+    return _public_models(config)['providers']['provider']
 
 
 def _public_mcp(servers: dict) -> dict:
@@ -123,6 +133,10 @@ def _restore_models(edited: dict, old: dict) -> dict:
             models[model_id] = _restore_key(
                 _merge_values(previous.get("models", {}).get(model_id, {}), model),
                 previous.get("models", {}).get(model_id, {}), inherited=True)
+        for model in models.values():
+            # 只在用户保存模型领域时移除已废弃参数，不迁移现有会话或启动时改配置。
+            model.pop('thinking', None)
+            model.pop('reasoning_effort', None)
         restored["models"] = models
         providers[identity] = restored
     result["providers"] = providers
@@ -170,6 +184,9 @@ class ConfigurationService:
         self.user_home = Path(user_home).expanduser().resolve() if user_home is not None else Path.home().resolve()
         self.config_path = get_global_config_path(self.user_home)
         self._lock = threading.RLock()
+        # 同一个进程复用按实际连接隔离的发现缓存，设置页关闭不会清空缓存。
+        self.model_discovery = ModelDiscoveryClient()
+        self._discovery_auth_invalid: set[str] = set()
 
     def _paths(self, project_root: Path | None) -> dict[str, Path]:
         paths = {"config": self.config_path,
@@ -216,7 +233,59 @@ class ConfigurationService:
                 user_rules_path=get_global_permissions_path(self.user_home),
                 project_rules_path=get_project_permissions_path(project) if project_root is not None else None,
             ),
+            model_discovery=self.model_discovery,
         )
+
+    def candidate_provider(self, payload: dict, project_root: Path | None = None):
+        """发现使用表单副本；恢复留空的凭据，不要求首次配置已有默认模型。"""
+        if not isinstance(payload, dict):
+            raise ConfigurationError('模型发现内容必须是对象。')
+        identity = payload.get('provider_id')
+        if not isinstance(identity, str) or re.fullmatch(r'[\w-]+', identity) is None:
+            raise ConfigurationError('请选择有效供应商标识。')
+        with self._lock:
+            if payload.get('revision') != self._revision(project_root):
+                raise ConfigurationError('配置已在其他窗口更新，请刷新设置后重新发现。', 409)
+            current = _read_yaml(self.config_path)
+            old = current.get('providers', {})
+            if not isinstance(old, dict):
+                raise ConfigurationError('现有 providers 配置需要对象。')
+            edited = payload.get('provider', old.get(identity))
+            if not isinstance(edited, dict):
+                raise ConfigurationError('请填写供应商的名称、协议、地址和 API Key。')
+            try:
+                restored = _restore_models({'providers': {identity: edited}}, current)['providers'][identity]
+                # 固定 SDK 的领域加载器能独立校验供应商，也允许尚未加入任何模型。
+                return _load_provider(restored, 'provider')
+            except ConfigurationError:
+                raise
+            except (ConfigError, ValueError, TypeError, AttributeError) as exc:
+                raise ConfigurationError('供应商参数无效，请检查名称、协议、连接和模型覆盖。') from exc
+
+    async def discover_models(self, payload: dict, project_root: Path | None = None) -> ModelDiscoveryResult:
+        refresh = payload.get('refresh', False) if isinstance(payload, dict) else False
+        if type(refresh) is not bool:
+            raise ConfigurationError('刷新标记必须为布尔值。')
+        provider = self.candidate_provider(payload, project_root)
+        fingerprint = None
+        try:
+            protocol, base_url, api_key, _ = discovery_connection(provider)
+            fingerprint = connection_fingerprint(protocol, base_url, api_key)
+            auth_invalid = fingerprint in self._discovery_auth_invalid
+            result = await self._settings_service(project_root).discover_models(provider, refresh=refresh or auth_invalid)
+            if auth_invalid and result.stale:
+                raise ConfigurationError('这份连接的认证已失效，请检查凭据后重新发现模型。', 401)
+            self._discovery_auth_invalid.discard(fingerprint)
+        except ProviderError as exc:
+            if isinstance(exc, ProviderAuthError) and fingerprint is not None:
+                self._discovery_auth_invalid.add(fingerprint)
+            # SDK 发现错误已经使用固定提示，不能把远端正文、地址或凭据回传。
+            raise ConfigurationError(exc.user_message, 401 if isinstance(exc, ProviderAuthError) else 400) from exc
+        with self._lock:
+            revision = self._revision(project_root)
+            if revision != payload.get('revision'):
+                raise ConfigurationError('配置在发现期间发生变化，请刷新设置后重新发现。', 409)
+        return result
 
     def snapshot(self, project_root: Path | None = None) -> dict:
         with self._lock:

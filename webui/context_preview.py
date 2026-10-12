@@ -27,7 +27,7 @@ def saved_context_usage(state, transcript, provider_config):
     request = ChatRequest(
         model=prefix["model"], system=list(prefix["system"]), messages=messages(projected),
         tools=[restore_tool(value) for value in tools.values()], allow_tool_calls=True,
-        thinking=provider_config.thinking if prefix["protocol"] == "claude" else None,
+        reasoning_effort=state.reasoning_effort, api_mode=provider_config.api_mode,
         experimental_mcp_tool_append=experimental, tool_updates=updates,
         prompt_cache_enabled=(experimental or prefix["protocol"] == "claude"
                               and urlsplit(provider_config.base_url).hostname == "api.anthropic.com"),

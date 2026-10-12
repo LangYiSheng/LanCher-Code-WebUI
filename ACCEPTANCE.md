@@ -2,7 +2,38 @@
 
 2026-10-12，新 LanCher Code WebUI 完成以下验证。旧 Agent Lab 的演示模型与 Docker 记录属于备份，没有用作本版本通过的依据。
 
-## 自动化与原生工具
+## 核心同步 f3329bc
+
+先将已验收 WebUI 成果提交为 `b1961e3`，再同步核心最近三个提交。新版 wheel 固定到 `f3329bc9bcc8b2ef7afd08cc80d3c9f85bcfd61b`，使用 `git archive` 从已提交源码归档到本项目 ignored `vendor/sdk-f3329bc`，没有从工作区未提交代码构建。
+
+- wheel SHA256：`d9a79a6e64f60c539e354107dea51f72b904a11a74831844739af7323a1cdb70`，记录在 [vendor/snapshot.json](vendor/snapshot.json)。SDK 版本仍为 0.1.0，安装保留按哈希校验及单包显式重装。
+- 核心依赖声明未变，`requirements.lock.txt` 的 44 项版本与直接 wheel 路径保持不变。专用新环境 `data/sdk-update-f3329bc/venv` 安装及 pip check 全部兼容；六份关键安装代码的哈希与固定归档一致，见 [构建来源证明](data/sdk-update-f3329bc/build-proof.json)。
+- 新环境完整后端回归 **55 passed，139.22 秒**，见 [完整输出](data/sdk-update-f3329bc/pytest-final.stdout.txt)。复审新增恢复继承 1 项、校验脱敏 2 项、认证失效恢复 1 项，连同相关发现/推理/fixture 共 **12 passed，5.70 秒**，见 [定向输出](data/sdk-update-f3329bc/pytest-review-fixed.stdout.txt)。当前测试库 **59 项均有通过证据**，没有声称单次执行完整 59 项。
+- [新版契约测试](tests/test_sdk_update.py) 覆盖草稿推理控制、原生首任务与同 UUID 恢复、能力不支持时回 auto、忙时拒绝及命令补全；压缩实际继承 high 与所选 API 形式。发现通过真实本机 HTTP 和原生 SDK client 验证分页、ENV 密钥引用、同源模型更新与独立连接保护、合并不保存、显式 PATCH、scope/revision/connection/token 失效。
+- 认证 401 后旧票据立即失效，默认重开仍向远端确认；随后 500 不可用旧 stale 列表，fresh 200 才恢复缓存。422 校验错误使用固定提示，不回显含密钥 input。发现合并保留 auto、None、空名称和密钥恢复继承意图，保存后由 SDK 读回确认有效。
+- 缓存率按同批有效 input/cache 样本计算，保留估算标志与样本数。真实本机 SSE 5 请求汇总为 input 400/output 71/cache 107，总量仍 471；估算缓存率 107/400，4 个有效样本来自 5 个请求，不把缓存、推理子项再次计入总量。
+- 专用 [UI fixture 脚本](scripts/ui_acceptance_fixture.py) 的 `--model-api` 必须显式启用，默认不改 preset、不增加模型路由。启用时只改 fixture home 的 test 连接，保留虚拟密钥，在同端口返回有档位、明确无档位、custom ultra 和未知能力四类列表；[范围测试](tests/test_ui_model_fixture.py) 已通过。
+
+前端新版 **33 项测试、TypeScript 与 Vite 构建通过**，资源为 `index-DYibOGIn.js` / `index-CNVSh9j_.css`。以下初版在线 16 项测试与截图保留原 SDK 00e0797 来源，不能作为新版在线重跑的证据。
+
+新版实际 IAB 验收使用专用新环境与 8767 fixture，模型列表接口和密钥都是本机虚拟数据，全程没有外部模型请求：
+
+- 列表展示 4 项、2 项已加入，区分 low/high、明确不支持、自定义 ultra 与未知能力。先勾选 Mini，再搜索 unknown，隐藏选择仍保留 1 项；加入只修改设置草稿，HTTP 读回确认未提前写入 metadata。
+- 显式保存后新增 Mini，并更新两个同源既有模型 metadata；默认模型 `test/one` 与手动显示名 `fixture-one-ui` 保留。最终独立 HTTP 读回 one/two/Mini 三项，two 档位为空、Mini 为 low/ultra，API Key 仍只显示已配置而无原文。
+- 同一原生对话 high 刷新后保留，换到明确无档位的 fixture-two 时只有 auto 且核心提示回退；换到 Mini 时自定义选择器显示 auto/low/ultra。裸 `/effort` 打开推理选择面板，没有模型请求。
+- 草稿 `6d5b05005be9469c9c434fd8ad3d9193` 的中文输入与 high 刷新后保留，不进入正式历史侧栏；正式对话仍为 A/C 两项。Native select 数为 0，390px 窄屏无溢出，控件换行后权限选择仍可操作。控制台 error 为 0。
+
+| 新版实际截图 | 内容 |
+|---|---|
+| [发现模型](C:/Users/LanCher/.codex/visualizations/2026/10/12/01a12ec2-dc0e-7083-a0c4-4556d3d2f944/lancher-code-webui-model-discovery.jpg) | 四类能力声明与已加入状态 |
+| [推理强度](C:/Users/LanCher/.codex/visualizations/2026/10/12/01a12ec2-dc0e-7083-a0c4-4556d3d2f944/lancher-code-webui-effort.jpg) | Mini 自定义 auto/low/ultra 下拉菜单 |
+| [窄屏推理控制](C:/Users/LanCher/.codex/visualizations/2026/10/12/01a12ec2-dc0e-7083-a0c4-4556d3d2f944/lancher-code-webui-effort-mobile.jpg) | 390px 草稿与换行控件 |
+
+证据为 [新版实际浏览器记录](data/sdk-update-f3329bc/browser-qa.json)、[脱敏设置读回](data/sdk-update-f3329bc/ui-model-settings-readback.json) 与 [验收实例关闭](data/sdk-update-f3329bc/ui-shutdown.json)。8767 已优雅关闭，actual PID 67256 与 launcher 66792 都结束、端口无监听；正式 8765 只读检查返回 200。
+
+主任务在确认正式服务无任务和后台进程后完成生产升级：优雅关闭、只对 current wheel 执行 `--no-deps --reinstall`、44 包 pip check 兼容，再启动 8765。最终 actual PID 64668、launcher 42432，只监听本机；SDK 状态返回完整 f3329bc SHA，首页 200 且使用新版 bundle，config_error=null，14 条命令含 effort。原核心仓库 HEAD 仍为 f3329bc 且工作区干净。以上生产升级由主任务执行，验收任务只操作独立环境和 fixture。 [生产安装来源证明](data/sdk-update-f3329bc/production-proof.json) 记录正式 `.venv` 的安装路径及六份 SDK 文件与固定归档的哈希一致结果。
+
+## 初版自动化与原生工具
 
 最终完整执行后端测试：**47 项全部通过，151.54 秒**，包括此前 42 项和新增草稿生命周期 5 项。早期完整 31 项输出仍保存在 [data/pytest-final.stdout.txt](data/pytest-final.stdout.txt)；真实本机 SSE 用量、文件语义、只读上下文与草稿测试分别位于 [tests/test_usage_http.py](tests/test_usage_http.py)、[tests/test_file_change_semantics.py](tests/test_file_change_semantics.py)、[tests/test_context_preview.py](tests/test_context_preview.py) 与 [tests/test_drafts.py](tests/test_drafts.py)。
 
@@ -51,7 +82,7 @@
 
 验收只在上述新建专用目录工作，没有修改用户共享配置或原 LanCher Code 开发仓库。
 
-## 前端与真实浏览器
+## 初版前端与真实浏览器
 
 前端完整执行 **25 项测试全部通过**：状态/快照/归属 6 项、检查器契约 6 项、用量语义 7 项、面板宽度与草稿恢复 6 项；TypeScript 检查与 Vite 构建通过。最终构建为 `index-D754RdNf.js` 与 `index-dNoHAKTX.css`。
 
@@ -87,6 +118,6 @@
 
 ## 固定 SDK 边界
 
-固定 00e0797 SDK 没有原生取消归档接口。网页恢复归档时恢复 Web 导航，保留 SDK archived 标记；TUI 可以按 UUID 恢复完整历史。宿主没有编造 SDK 事件。
+当前固定 f3329bc SDK 仍没有原生取消归档接口；三个同步提交未改变 archive_session 接口，也没有新增 unarchive。网页恢复归档时恢复 Web 导航，保留 SDK archived 标记；TUI 可以按 UUID 恢复完整历史。宿主没有编造 SDK 事件。
 
 原生命令运行在本机，权限属于 SDK 应用层检查，Docker 不是运行依赖。原开发仓库代码、环境与 Git 状态保持独立。旧 `D:\Dev\LanCher Agent Lab` 因文件句柄未改名，仍保留为历史备份，旧数据在本项目 `data/legacy/data/` 只读展示。

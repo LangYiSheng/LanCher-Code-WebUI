@@ -85,11 +85,14 @@ async def complete(manager, chat_id: str, text: str) -> dict:
         response = await manager.action(chat_id, "mcp_status")
         rows = response.get("servers", response.get("mcp", []))
         servers = tuple((row["name"], row.get("status") or row.get("state", "")) for row in rows if row.get("name"))
+    effort = manager.effort_state(chat)
     context = SlashCompletionContext(
         text=text, session_choices=sessions, active_session_id=chat.get("sdk_session_id"),
         process_choices=processes, model_choices=models, skill_choices=skills, mcp_choices=servers,
         active_model_ref=chat.get("model_ref"), default_model_ref=default_model,
         execution_access=chat.get("access", chat.get("execution_access", "project")),
+        effort_levels=tuple(effort['effort_levels']), active_effort=effort['reasoning_effort'],
+        effort_known=effort['effort_known'],
     )
     match = REGISTRY.parse_submission(text)
     busy = chat.get("status") in {"queued", "running", "waiting_permission", "starting", "stopping", "compacting"}
@@ -129,6 +132,10 @@ async def execute(manager, chat, text: str, confirmed: bool = False) -> dict:
         if not arguments:
             return {**response, "ui_action": "model_picker"}
         return {**response, "result": await manager.action(chat_id, "model", {"model_ref": arguments})}
+    if name == "effort":
+        if not arguments:
+            return {**response, "ui_action": "effort_picker"}
+        return {**response, "result": await manager.action(chat_id, "effort", {"effort": arguments})}
     if name == "access":
         if not arguments:
             return {**response, "ui_action": "access_picker"}

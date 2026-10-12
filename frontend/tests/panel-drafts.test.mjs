@@ -30,7 +30,7 @@ test('本地草稿元数据不复制聊天正文、队列或用量',()=>{
   assert.equal('messages' in restored[id],false);assert.equal('queue' in restored[id],false);assert.equal('usage' in restored[id],false);
 });
 test('重建保留同Web id与显式控制选项，不提交旧SDK会话ID或未知控制值',()=>{
-  assert.deepEqual(draftCreatePayload({...draft,sdk_session_id:'old-sdk'}),{project_id:'project-a',draft_id:id,title:'草稿',model_ref:'provider/model',phase:'plan',access:'full'});
+  assert.deepEqual(draftCreatePayload({...draft,sdk_session_id:'old-sdk'}),{project_id:'project-a',draft_id:id,title:'草稿',model_ref:'provider/model',reasoning_effort:'auto',phase:'plan',access:'full'});
   const payload=draftCreatePayload({...draft,model_ref:'',phase:'unknown',access:'read_only'});
   assert.equal('phase' in payload,false);assert.equal('access' in payload,false);assert.equal('model_ref' in payload,false);
 });
@@ -39,4 +39,10 @@ test('浏览器恢复不会沿用上次服务事件游标，保留草稿控制�
   const restored=restoreDraftChats({one:{...draft,_event_sequence:9000}});
   assert.equal(restored[id]._event_sequence,undefined);
   assert.equal(restored[id].phase,'plan');assert.equal(restored[id].access,'full');
+});
+
+test('对话级推理强度随草稿身份恢复并提交给重建接口',()=>{
+  const restored=restoreDraftChats({one:{...draft,reasoning_effort:'high',effort_levels:['auto','low','high'],effort_known:true}})[id];
+  assert.equal(restored.reasoning_effort,'high');assert.deepEqual(restored.effort_levels,['auto','low','high']);
+  assert.equal(draftCreatePayload(restored).reasoning_effort,'high');
 });

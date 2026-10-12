@@ -78,7 +78,10 @@ def test_bootstrap_is_shared_config_but_secrets_not_forwarded(client, isolated):
     import lancher_code
     root, home, workspace = isolated
     source = Path(lancher_code.__file__).resolve()
-    assert source.is_relative_to(Path(__file__).resolve().parents[1] / '.venv')
+    # SDK 必须安装在本 WebUI 自己的测试/生产环境，不得借用原开发源码。
+    environment = Path(sys.prefix).resolve()
+    assert environment.is_relative_to(Path(__file__).resolve().parents[1])
+    assert source.is_relative_to(environment)
     bootstrap = request(client, 'GET', '/api/bootstrap')
     assert {'projects', 'chats', 'models', 'commands', 'watermark', 'preferences'} <= bootstrap.keys()
     assert 'fixture-secret-never-exposed' not in json.dumps(bootstrap)

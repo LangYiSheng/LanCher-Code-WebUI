@@ -42,7 +42,7 @@ export function toolIconName(name=''):string {
   if(tool.includes('fetch')||tool.includes('web'))return 'globe';
   return 'code';
 }
-const commandIcons:Record<string,string>={discuss:'chat',plan:'plan',do:'play',session:'history',sessions:'history',tasks:'terminal',skills:'skill',mcp:'mcp',model:'globe',access:'shield',compact:'archive',settings:'settings',status:'activity',exit:'exit',help:'unknown'};
+const commandIcons:Record<string,string>={discuss:'chat',plan:'plan',do:'play',session:'history',sessions:'history',tasks:'terminal',skills:'skill',mcp:'mcp',model:'globe',effort:'spark',access:'shield',compact:'archive',settings:'settings',status:'activity',exit:'exit',help:'unknown'};
 // 参数补全沿用当前根命令的图标；根命令列表则按每条候选自身取图标。
 export function commandIconName(text:string,candidate=''):string {
   const typed=text.trimStart().match(/^\/([\w-]+)(?:\s|$)/)?.[1];

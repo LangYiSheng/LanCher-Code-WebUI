@@ -1,6 +1,6 @@
 export type Dict = Record<string, any>;
 export type Project = {id:string;name:string;path:string;available:boolean;pinned?:boolean};
-export type ChatSummary = {id:string;project_id:string;sdk_session_id?:string;draft?:boolean;first_turn_accepted_at?:string;title:string;status:string;phase:string;access:string;model_ref:string;pinned?:boolean;archived?:boolean;updated_at?:string;pending_config?:boolean|Dict;model_notice?:string;queue_paused?:boolean;_event_sequence?:number};
+export type ChatSummary = {id:string;project_id:string;sdk_session_id?:string;draft?:boolean;first_turn_accepted_at?:string;title:string;status:string;phase:string;access:string;model_ref:string;reasoning_effort?:string;effort_levels?:string[];effort_known?:boolean;pinned?:boolean;archived?:boolean;updated_at?:string;pending_config?:boolean|Dict;model_notice?:string;queue_paused?:boolean;_event_sequence?:number};
 export type Trace = {kind:string;text?:string;call_id?:string;tool_name?:string;arguments?:Dict;metadata?:Dict;ok?:boolean};
 export type Message = {id:string;role:string;content:string;status:string;timestamp?:string;trace?:{entries:Trace[]};usage?:Dict};
 export type Permission = {request_id:string;title:string;prompt:string;details:string;command?:string;file_paths?:string[];preview_lines?:Dict[];directory_grants?:Dict[];tool_name?:string};

@@ -30,7 +30,8 @@ class ScriptedProvider:
     def prompt(request):
         for message in reversed(request.messages):
             text = '\n'.join(block.text for block in message.blocks if block.kind == 'text')
-            if message.role == 'user' and not text.lstrip().startswith('<host_update '):
+            if (message.role == 'user' and message.control_kind is None
+                    and not text.lstrip().startswith('<host_update ')):
                 return text
         return ''
 
@@ -42,7 +43,8 @@ class ScriptedProvider:
         plan = self.plans.get(prompt, [Reply(text=f'完成：{prompt}')])
         reply = plan[min(position, len(plan) - 1)]
         self.requests.append({'prompt': prompt, 'session_id': request.session_id, 'position': position,
-                              'model': request.model})
+                              'model': request.model, 'reasoning_effort': request.reasoning_effort,
+                              'api_mode': request.api_mode})
         if reply.gate:
             yield StreamEvent(kind='text_delta', text='等待测试闸门。')
             while not reply.gate.is_set():

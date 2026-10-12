@@ -8,6 +8,7 @@ import threading
 import time
 
 from fastapi.testclient import TestClient
+import pytest
 import yaml
 
 from test_integration import action, chat, complete, detail, project, request, submit, wait
@@ -216,7 +217,10 @@ def test_native_http_retry_switch_model_and_cancel_keep_unique_usage_records(iso
                          input_tokens=400, output_tokens=71, cache=107, creation=33, reasoning=24)
                 # 缓存包含在 input，推理包含在 output；总量为 471，不能再次相加。
                 assert cancelled['usage'][scope]['input_tokens'] + cancelled['usage'][scope]['output_tokens'] == 471
-                assert cancelled['usage'][scope]['cache_hit_ratio'] is None
+                # f3329bc 同批 input/cache 样本保留估算率，失败未知样本不压低分母。
+                assert cancelled['usage'][scope]['cache_hit_ratio'] == pytest.approx(107 / 400)
+                assert cancelled['usage'][scope]['cache_ratio_estimated'] is True
+                assert cancelled['usage'][scope]['cache_ratio_request_count'] == 4
 
             records = _records(client, identity)
             ids = {row['request_id'] for row in records}

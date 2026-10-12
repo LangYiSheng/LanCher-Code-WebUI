@@ -17,14 +17,20 @@ export function usageSummary(all:Dict|undefined,scope:UsageScope){
   const anyKnown=TOKEN_FIELDS.some(key=>tokens[key]!==null);
   const missing=TOKEN_FIELDS.some(key=>tokens[key]===null);
   const isFinal=values.is_final!==false;
-  const state=requestCount===0&&!anyKnown?'empty':!anyKnown?'unknown':(invalid||0)>0?'invalid':!isFinal||(incomplete||0)>0?'incomplete':partial.length||missing?'partial':'complete';
+  const state=requestCount===0?'empty':!anyKnown?'unknown':(invalid||0)>0?'invalid':!isFinal||(incomplete||0)>0?'incomplete':partial.length||missing?'partial':'complete';
   const quality={empty:'尚无请求',unknown:'尚无有效上报',invalid:'含无效上报',incomplete:'上报未完成',partial:'部分字段未知',complete:'已完整上报'}[state];
-  const total=tokens.input_tokens===null||tokens.output_tokens===null?null:tokens.input_tokens+tokens.output_tokens;
+  const total=tokens.input_tokens===null&&tokens.output_tokens===null?null:(tokens.input_tokens??0)+(tokens.output_tokens??0);
   const shortKeys:Record<TokenField,string>={input_tokens:'input',output_tokens:'output',cached_input_tokens:'cache',cache_creation_input_tokens:'cache_creation',reasoning_output_tokens:'reasoning'};
   const isPartial=(key:TokenField)=>partial.includes(shortKeys[key])||!isFinal||(incomplete||0)>0;
-  const totalPartial=isPartial('input_tokens')||isPartial('output_tokens');
+  const totalPartial=tokens.input_tokens===null||tokens.output_tokens===null||isPartial('input_tokens')||isPartial('output_tokens');
   const knownSubtotal=(key:TokenField)=>{if(tokens[key]!==null&&isPartial(key))return tokens[key];const count=reportedNumber(raw[key]);return tokens[key]===null&&count!==null&&count>0?count:null;};
-  return {raw,tokens,partial,requestCount,invalid,incomplete,state,quality,total,totalPartial,isPartial,knownSubtotal,isFinal,cacheHitRatio:reportedNumber(raw.cache_hit_ratio)};
+  const cacheHitRatio=reportedNumber(raw.cache_hit_ratio);
+  const cacheRatioEstimated=cacheHitRatio!==null&&raw.cache_ratio_estimated===true;
+  const cacheRatioRequestCount=reportedNumber(raw.cache_ratio_request_count);
+  const cacheRatioText=cacheHitRatio===null?'—':(cacheRatioEstimated?'≈':'')+(cacheHitRatio*100).toFixed(1)+'%';
+  const cacheRatioNote=cacheRatioEstimated?`按 ${cacheRatioRequestCount??'—'} / ${requestCount??'—'} 次请求的已知输入与缓存量计算；估算，可能不准。`
+    :cacheHitRatio===null?requestCount===0?'尚无请求。':(invalid||0)>0?'异常请求已排除，暂无可计算的缓存率样本。':'无可计算样本或样本输入为零。':'';
+  return {raw,tokens,partial,requestCount,invalid,incomplete,state,quality,total,totalPartial,isPartial,knownSubtotal,isFinal,cacheHitRatio,cacheRatioEstimated,cacheRatioRequestCount,cacheRatioText,cacheRatioNote};
 }
 export function contextSummary(context:Dict|undefined){
   const raw=context||{};const tokens=reportedNumber(raw.tokens);const reportedWindow=reportedNumber(raw.window);const window=reportedWindow!==null&&reportedWindow>0?reportedWindow:null;

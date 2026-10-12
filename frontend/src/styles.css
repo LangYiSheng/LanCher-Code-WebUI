@@ -914,3 +914,39 @@ input:not([type=checkbox]),textarea,select{border-radius:var(--radius-control)}
 .file-viewer,.file-directory{box-shadow:none;border-radius:0}
 @media(max-width:1100px){.main-workspace>.inspector{position:absolute;right:0;top:0;bottom:0;z-index:20;width:min(520px,100%);max-width:100%;box-shadow:-2px 0 14px #00000009}.inspector-return{display:inline-flex}}
 @media(max-width:600px){.file-directory{border-left:0;border-bottom:1px solid color-mix(in srgb,var(--border) 45%,transparent)}.inspector-resize-handle{left:0}}
+
+/* 新核心的接口能力和对话推理选项沿用工作台表单。 */
+.composer-left{flex-wrap:wrap;row-gap:3px}
+.composer-left .effort-select{max-width:122px}
+.composer-controls{align-items:flex-end}
+.usage-footer-ratio{color:var(--muted);margin-left:4px;white-space:nowrap;font-size:9px}
+.model-metadata{padding-top:16px;margin-top:16px;border-top:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
+.model-metadata h4{font-size:12px;font-weight:550;margin-bottom:9px}
+.model-metadata .data-list{font-size:11px}
+.model-metadata dd{overflow-wrap:anywhere}
+.model-discovery-modal{max-width:700px;display:flex;flex-direction:column;overflow:hidden;max-height:88dvh}
+.model-discovery-modal>.modal-heading,.model-discovery-modal>.modal-footer{flex-shrink:0}
+.discovery-summary{display:flex;align-items:center;gap:9px;font-size:11px;flex-wrap:wrap;flex-shrink:0;margin-bottom:7px;color:var(--muted)}
+.discovery-summary>.text-button{margin-left:auto}
+.discovery-fetched{font-size:10px;margin-bottom:10px}
+.discovery-notice{padding:10px 12px;background:var(--surface);border-radius:var(--radius-control);font-size:11px;line-height:1.8;flex-shrink:0;margin-bottom:12px}
+.discovery-notice.stale{color:var(--amber)}
+.discovery-search{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-control);flex-shrink:0}
+.discovery-search>input{min-width:0;flex:1;background:none;border:0;padding:3px;font-size:12px;outline:none}
+.discovery-selection{display:flex;gap:15px;align-items:center;flex-wrap:wrap;padding:10px 1px;flex-shrink:0}
+.discovery-selection>span{margin-left:auto;font-size:10px;color:var(--muted)}
+.discovery-models{min-height:80px;overflow:auto;flex:1;margin:2px -4px;padding:0 4px;max-height:48dvh}
+.discovery-model{display:flex;align-items:flex-start;gap:11px;padding:11px 10px;border-radius:var(--radius-control);cursor:pointer}
+.discovery-model:hover{background:var(--surface)}
+.discovery-model>input{margin-top:4px;flex-shrink:0;accent-color:var(--blue)}
+.discovery-model>div{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.discovery-model strong{font-size:12px;font-weight:550;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px}
+.discovery-model strong>small{font-size:9px;font-weight:400;color:var(--muted);padding:2px 5px;background:var(--surface);border-radius:4px;flex-shrink:0}
+.discovery-model code{font:10px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.discovery-model div>span{font-size:10px;color:var(--muted);line-height:1.6}
+.discovery-model.already-added{cursor:default;color:var(--muted)}
+.discovery-more{display:block;margin:12px auto}
+.model-discovery-modal>.inline-error{flex-shrink:0;font-size:11px;margin-bottom:8px}
+.model-discovery-modal .modal-footer{margin-top:16px}
+@media(max-width:1100px){.usage-footer-ratio{display:none}}
+@media(max-width:600px){.composer-left .custom-select.effort-select{max-width:100px}.model-discovery-modal{padding:16px;max-height:92dvh}.discovery-selection{gap:10px}.discovery-selection>span{width:100%;margin:0}.discovery-model strong{flex-wrap:wrap}.discovery-models{max-height:46dvh}.model-discovery-modal .modal-footer{gap:7px}.discovery-summary{font-size:10px}}

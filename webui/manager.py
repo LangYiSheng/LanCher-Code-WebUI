@@ -29,6 +29,8 @@ from lancher_code.usage.ledger import RequestUsageRecord,summarize_records
 from .configuration import ConfigurationService
 from .context_preview import saved_context_usage
 from lancher_code.providers.catalog import resolve_model
+from lancher_code.providers.reasoning import EFFORT_LEVELS, validate_effort
+from lancher_code.errors import ConfigError
 from .files import list_files,read_file,validate_reference,resolve_project_file,file_change
 from lancher_code.permissions.engine import PermissionEngine
 from lancher_code.contracts.tools import ToolCall
@@ -132,7 +134,29 @@ class AppManager:
         signal=self.signal;self.signal=asyncio.Event();signal.set()
         return event
 
+    def effort_state(self,chat):
+        """不用创建 owner 即可展示档位；未知能力不能当成不支持。"""
+        owner=self.owners.get(chat['id'])
+        if owner:
+            agent=owner.agent
+            return {'reasoning_effort':agent.reasoning_effort,'effort_levels':list(agent.effort_levels),
+                    'effort_known':agent.effort_known}
+        effort=chat.get('reasoning_effort','auto')
+        try:
+            config=self._config();ref=chat.get('model_ref') or config.default_model
+            if ref not in {provider_id+'/'+model_id for provider_id,provider in config.providers.items() for model_id in provider.models}:
+                ref=config.default_model
+            provider=resolve_model(config.providers,ref)
+            cap=validate_effort(provider.protocol,provider.metadata,'auto')
+            levels=('auto',*cap.levels) if cap.levels is not None else EFFORT_LEVELS
+            return {'reasoning_effort':effort if effort in levels else 'auto',
+                    'effort_levels':list(levels),'effort_known':cap.levels is not None}
+        except Exception:
+            return {'reasoning_effort':effort if effort in EFFORT_LEVELS else 'auto',
+                    'effort_levels':list(EFFORT_LEVELS),'effort_known':False}
+
     def changed(self,chat):
+        chat.update(self.effort_state(chat))
         self._save(chat);self.emit({'kind':'chat_state','chat':dict(chat)},chat=chat)
 
     def _config(self):
@@ -309,7 +333,7 @@ class AppManager:
                 self.chats.pop(chat['id']);self.store.remove('chats',chat['id'])
         self.store.put('projects',identity,project)
 
-    async def create_chat(self,project_id,title='',model_ref=None,draft_id=None,phase=None,access=None):
+    async def create_chat(self,project_id,title='',model_ref=None,draft_id=None,phase=None,access=None,reasoning_effort=None):
         self.project_root(project_id)
         if draft_id is not None:
             if not isinstance(draft_id,str) or len(draft_id)!=32 or any(char not in '0123456789abcdefABCDEF' for char in draft_id):
@@ -322,13 +346,19 @@ class AppManager:
             if any(chat.get('sdk_session_id')==identity for chat in self.chats.values()):
                 raise WebError('这个标识已属于 SDK 会话，不能作为空白草稿复用。',409)
         else:identity=uuid4().hex
+        config=None
         try:
             config=self._config();model_ref=model_ref or config.default_model
             default_phase=config.runtime.work_phase;default_access=config.runtime.execution_access
         except WebError:default_phase='execute';default_access='project'
         phase,access=validate_runtime_axes(phase or default_phase,access or default_access)
+        effort='auto' if reasoning_effort is None else reasoning_effort
+        if config is not None:
+            resolved=resolve_model(config.providers,model_ref)
+            validate_effort(resolved.protocol,resolved.metadata,effort)
+        else:validate_effort('openai',None,effort)
         chat={'id':identity,'project_id':project_id,'sdk_session_id':None,'draft':True,'title':title.strip() or '新对话',
-              'status':'idle','phase':phase,'access':access,'model_ref':model_ref,'pinned':False,'archived':False,
+              'status':'idle','phase':phase,'access':access,'model_ref':model_ref,'reasoning_effort':effort,'pinned':False,'archived':False,
               'created_at':now(),'updated_at':now(),'pending_config':False,'queue_paused':False}
         self.chats[identity]=chat;self.changed(chat);return dict(chat)
 
@@ -355,7 +385,7 @@ class AppManager:
         if key in self.snapshot_cache:return self.snapshot_cache[key]
         raw=SessionCodec.project(repo.read(chat['sdk_session_id']))
         state,transcript,_,model_ref=SessionCodec.decode(raw,chat['sdk_session_id'])
-        data=json_value(state);chat.update(phase=state.work_phase,access=state.execution_access,model_ref=model_ref or chat.get('model_ref'))
+        data=json_value(state);chat.update(phase=state.work_phase,access=state.execution_access,model_ref=model_ref or chat.get('model_ref'),reasoning_effort=state.reasoning_effort)
         try:
             config=self._config();provider=resolve_model(config.providers,chat.get('model_ref') or config.default_model)
             data['_context_preview']=saved_context_usage(state,transcript,provider)
@@ -388,12 +418,18 @@ class AppManager:
             config=self._config();ui=json_value(config.ui)
             for provider_id,provider in config.providers.items():
                 for model_id,model in provider.models.items():
-                    models.append({'id':provider_id+'/'+model_id,'name':model.display_name or model.model_name,
-                                   'provider':provider.name,'default':provider_id+'/'+model_id==config.default_model})
+                    reference=provider_id+'/'+model_id
+                    resolved=resolve_model(config.providers,reference)
+                    cap=validate_effort(resolved.protocol,resolved.metadata,'auto')
+                    models.append({'id':reference,'name':model.display_name or model.model_name,
+                                   'provider':provider.name,'default':reference==config.default_model,
+                                   'metadata':json_value(resolved.metadata),'api_mode':resolved.api_mode,
+                                   'effort_levels':list(('auto',*cap.levels) if cap.levels is not None else EFFORT_LEVELS),
+                                   'effort_known':cap.levels is not None})
         except WebError as exc:config_error=str(exc)
         from .commands import command_catalog
         return {'name':'LanCher Code WebUI','sdk_commit':self.sdk_snapshot['commit'],
-                'projects':list(self.projects.values()),'chats':list(self.chats.values()),'models':models,
+                'projects':list(self.projects.values()),'chats':[{**chat,**self.effort_state(chat)} for chat in self.chats.values()],'models':models,
                 'ui':ui,'preferences':self.preferences,'config_error':config_error,
                 'watermark':self.store.watermark,'commands':command_catalog(),'legacy_count':len(self.legacy()),
                 'execution':'本机运行 · SDK 原生工具','config_path':str(self.user_home/'.lancher/lancher.yaml')}
@@ -421,6 +457,7 @@ class AppManager:
             skills=json_value(SkillsService(root,user_root=self.user_home).list_skills())
             tools=json_value(create_default_tool_registry().list_definitions(include_deferred=True))
             processes=list(state.get('execution',{}).get('processes',{}).values())
+        chat.update(self.effort_state(chat))
         if not chat.get('draft'):self.store.put('chats',chat_id,chat)
         usage=self._usage(chat,state,owner)
         return {**chat,'messages':messages[start:end],'has_more':start>0,'next_before':start,
@@ -457,6 +494,8 @@ class AppManager:
                                provider_factory=self.provider_factory,mcp_manager=mcp_manager,enable_mcp=False)
             try:
                 if chat.get('sdk_session_id'):agent.resume_session(chat['sdk_session_id'])
+                else:agent.set_effort(chat.get('reasoning_effort','auto'))
+                chat['reasoning_effort']=agent.reasoning_effort
                 owner=Owner(agent,manual_pause=bool(chat.get('queue_paused') or agent.queue_paused));self.owners[chat_id]=owner
                 agent.subscribe(lambda event:self._on_event(chat,owner,event))
                 agent.capabilities.add_mcp_progress_callback(lambda progress:self.emit({'kind':'capabilities_updated','progress':json_value(progress),'mcp':agent.capabilities.mcp_status()},chat=chat))
@@ -492,19 +531,26 @@ class AppManager:
 
     async def patch_chat(self,chat_id,payload):
         chat=self.get_chat(chat_id)
-        if chat.get('draft') and any(key in payload for key in {'phase','access','model_ref'}):
+        if chat.get('draft') and any(key in payload for key in {'phase','access','model_ref','reasoning_effort'}):
             if self._active(chat_id) or chat['status']=='queued':raise WebError('当前对话正在运行或排队。',409)
             phase,access=validate_runtime_axes(payload.get('phase',chat['phase']),payload.get('access',chat['access']))
             model_ref=payload.get('model_ref',chat.get('model_ref'))
-            if 'model_ref' in payload:
+            effort=payload.get('reasoning_effort',chat.get('reasoning_effort','auto'))
+            if 'model_ref' in payload or 'reasoning_effort' in payload:
                 if not isinstance(model_ref,str) or not model_ref.strip():raise WebError('请选择有效模型。')
-                resolve_model(self._config().providers,model_ref)
+                resolved=resolve_model(self._config().providers,model_ref)
+                if 'reasoning_effort' in payload:validate_effort(resolved.protocol,resolved.metadata,effort)
+                else:
+                    try:validate_effort(resolved.protocol,resolved.metadata,effort)
+                    except ConfigError:effort='auto'
             owner=self.owners.get(chat_id)
             if owner:
                 if 'model_ref' in payload:owner.agent.switch_model(model_ref)
                 if 'access' in payload:owner.agent.set_execution_access(access)
                 if 'phase' in payload:owner.agent.set_phase(phase)
-            chat.update(phase=phase,access=access,model_ref=model_ref)
+                if 'reasoning_effort' in payload:owner.agent.set_effort(effort)
+                effort=owner.agent.reasoning_effort
+            chat.update(phase=phase,access=access,model_ref=model_ref,reasoning_effort=effort)
         if any(key in payload for key in {'title','archived'}) and (self._active(chat_id) or chat['status']=='queued' or self._process_count(chat_id)):
             raise WebError('请先停止对话任务和后台进程。',409)
         sdk_id=chat.get('sdk_session_id')
@@ -650,13 +696,14 @@ class AppManager:
         if action=='release':return await self.release(chat_id)
         owner=await self._owner(chat_id);agent=owner.agent
         busy=self._active(chat_id) or chat['status']=='queued'
-        idle_actions={'phase','access','model','plan_execute','skills_reload','skills_enable','skills_disable',
+        idle_actions={'phase','access','model','effort','plan_execute','skills_reload','skills_enable','skills_disable',
                       'skills_unload','mcp_refresh','mcp_reconnect','mcp_reload'}
         if action in idle_actions and busy:raise WebError('当前对话正在运行或排队，操作草稿已保留。',409)
         result={}
         if action=='phase':agent.set_phase(payload['phase']);chat['phase']=agent.work_phase
         elif action=='access':agent.set_execution_access(payload.get('access',payload.get('execution_access')));chat['access']=agent.execution_access
         elif action=='model':agent.switch_model(payload['model_ref']);chat['model_ref']=agent.model_ref
+        elif action=='effort':agent.set_effort(payload.get('effort'));chat['reasoning_effort']=agent.reasoning_effort
         elif action=='compact':
             if busy:raise WebError('当前对话忙碌，暂时无法压缩。',409)
             return await self._schedule(chat,{'kind':'compact'})

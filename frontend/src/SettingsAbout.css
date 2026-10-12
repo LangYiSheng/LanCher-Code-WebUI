@@ -1,0 +1,15 @@
+/* 关于页只呈现发布来源，沿用设置页主题与间距。 */
+.settings-about{max-width:750px;min-width:0;padding-top:8px}
+.settings-about-brand{display:flex;align-items:center;gap:15px;min-width:0;margin-bottom:30px;color:var(--text)}
+.settings-about-brand>div{min-width:0}
+.settings-about-brand h2{font-size:20px;font-weight:550;line-height:1.6;overflow-wrap:anywhere}
+.settings-about-brand p{font-size:11px;line-height:1.8;color:var(--muted);margin-top:3px}
+.settings-about-versions{margin:0;min-width:0}
+.settings-about-versions>div{display:grid;grid-template-columns:minmax(150px,40%) minmax(0,1fr);gap:20px;padding:19px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 40%,transparent)}
+.settings-about-versions dt{font-size:11px;color:var(--muted);line-height:1.8}
+.settings-about-versions dd{display:flex;flex-direction:column;gap:6px;min-width:0;margin:0;font-size:12px;line-height:1.8}
+.settings-about-versions strong{font-weight:500;color:var(--text)}
+.settings-about-versions code{font:11px/1.8 var(--mono);white-space:normal;overflow-wrap:anywhere;color:var(--text)}
+.settings-about-versions small,.settings-about-note{font-size:10px;line-height:1.8;color:var(--subtle)}
+.settings-about-note{margin-top:21px}
+@media(max-width:600px){.settings-about-brand{gap:12px;margin-bottom:22px}.settings-about-brand h2{font-size:18px}.settings-about-versions>div{grid-template-columns:minmax(0,1fr);gap:7px;padding:16px 0}.settings-about-versions dd{font-size:11px}.settings-about-versions code{font-size:10px}}

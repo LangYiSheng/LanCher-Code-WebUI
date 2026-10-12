@@ -431,7 +431,7 @@ class AppManager:
         return {'name':'LanCher Code WebUI','sdk_commit':self.sdk_snapshot['commit'],
                 'projects':list(self.projects.values()),'chats':[{**chat,**self.effort_state(chat)} for chat in self.chats.values()],'models':models,
                 'ui':ui,'preferences':self.preferences,'config_error':config_error,
-                'watermark':self.store.watermark,'commands':command_catalog(),'legacy_count':len(self.legacy()),
+                'watermark':self.store.watermark,'commands':command_catalog(),
                 'execution':'本机运行 · SDK 原生工具','config_path':str(self.user_home/'.lancher/lancher.yaml')}
 
     async def chat_detail(self,chat_id,before=None,limit=50):
@@ -839,21 +839,6 @@ class AppManager:
             if len(events)==500:continue
             try:await asyncio.wait_for(signal.wait(),12)
             except TimeoutError:yield None
-
-    def legacy(self,identity=None):
-        root=self.data/'legacy/data/sessions';rows=[]
-        if not root.is_dir():return [] if identity is None else None
-        for directory in root.iterdir():
-            if directory.is_symlink() or not directory.is_dir():continue
-            if identity is not None and directory.name!=identity:continue
-            try:
-                meta=json.loads((directory/'meta.json').read_text(encoding='utf-8-sig'))
-                row={'id':directory.name,'title':meta.get('title','历史对话'),'status':meta.get('status'),
-                     'mode':meta.get('mode'),'created_at':meta.get('created_at'),'read_only':True}
-                if identity is not None:row['messages']=meta.get('messages',[]);row['result']=meta.get('result')
-                rows.append(row)
-            except (OSError,ValueError):continue
-        return rows if identity is None else (rows[0] if rows else None)
 
     async def _maintain(self):
         try:

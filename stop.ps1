@@ -15,7 +15,7 @@ if ($taskRecord.project_root -ne $taskProject -or $taskNative.ExecutablePath -ne
     throw 'PID记录与实际进程不匹配；未发送关闭指令，也未终止进程。'
 }
 $taskUrl = 'http://127.0.0.1:'+([int]$taskRecord.port)
-try { Invoke-RestMethod -Method Post -Uri ($taskUrl+'/api/shutdown') -TimeoutSec 30 | Out-Null }
+try { Invoke-RestMethod -NoProxy -Method Post -Uri ($taskUrl+'/api/shutdown') -TimeoutSec 30 | Out-Null }
 catch { Write-Warning '优雅关闭请求未确认，将继续等待已经启动的服务退出。' }
 try { Wait-Process -Id $taskRecord.process_id -Timeout 30 -ErrorAction Stop }
 catch {

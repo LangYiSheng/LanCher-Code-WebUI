@@ -15,7 +15,7 @@ if (Test-Path -LiteralPath $taskPidPath) {
     }
 }
 try {
-    $taskProbe = Invoke-WebRequest -Uri ($taskUrl+'/api/bootstrap') -TimeoutSec 2
+    $taskProbe = Invoke-WebRequest -NoProxy -Uri ($taskUrl+'/api/bootstrap') -TimeoutSec 2
     throw ('端口 '+$Port+' 已有 HTTP 服务；请选择其他端口，不接管已有进程。')
 } catch {
     if ($_.Exception.Message -like '*已有 HTTP 服务*') { throw }
@@ -29,7 +29,7 @@ $taskReady = $false
 for ($taskAttempt=0; $taskAttempt -lt 60; $taskAttempt++) {
     if ($taskProcess.HasExited) { throw '服务启动时退出，请查看 data/server.stderr.log。' }
     try {
-        $taskState = Invoke-RestMethod -Uri ($taskUrl+'/api/bootstrap') -TimeoutSec 2
+        $taskState = Invoke-RestMethod -NoProxy -Uri ($taskUrl+'/api/bootstrap') -TimeoutSec 2
         $taskReady = $true
         break
     } catch { Start-Sleep -Milliseconds 250 }

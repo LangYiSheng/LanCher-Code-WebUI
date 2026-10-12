@@ -53,10 +53,6 @@ kbd{font:10px var(--mono);padding:3px 5px;border:1px solid var(--border);border-
 .new-chat-button{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;box-shadow:none;padding:11px 10px;font-size:13px;text-align:left;color:var(--text)}
 .new-chat-button>svg{color:var(--blue)}
 .new-chat-button kbd{margin-left:auto;border:0;background:transparent;color:var(--subtle)}
-.sidebar-search{display:flex;align-items:center;gap:7px;margin:13px 3px 22px;padding:0 5px;color:var(--muted)}
-.sidebar-search input{min-width:0;flex:1;padding:6px 0;font-size:12px;border:0;background:none;outline:none}
-.sidebar-search>button{padding:0}
-.sidebar-search kbd{font-size:9px;background:transparent;padding:2px 4px}
 .sidebar-section-heading{display:flex;align-items:center;justify-content:space-between;margin:0 10px 8px;color:var(--muted);font-size:11px}
 .sidebar-section-heading .icon-button{width:23px;height:23px}
 .project-tree{overflow:auto;flex:1;min-height:0;overflow-x:visible}
@@ -433,7 +429,6 @@ to{opacity:1;transform:translateY(0)}
 @media(max-width:1200px){.sidebar{width:220px}
 .brand{padding-left:6px}
 .brand>div{font-size:13px}
-.sidebar-search{margin-bottom:16px}
 .conversation-inner{padding:25px 24px}
 .composer-wrap{padding:0 21px 11px}
 .inspector{width:328px}
@@ -848,7 +843,7 @@ input:not([type=checkbox]),textarea,select{border-radius:var(--radius-control)}
 /* 左侧融入底色；桌面可收成图标栏，手机继续使用原来的抽屉。 */
 .sidebar-brand-row{display:flex;align-items:center;gap:7px;padding:0 7px 24px}
 .sidebar-brand-row .brand{padding:0;flex:1;min-width:0}.sidebar-brand-row .brand>div{white-space:nowrap}
-.sidebar-collapse-button,.desktop-sidebar-toggle,.sidebar-rail-actions{display:none}
+.desktop-sidebar-toggle,.sidebar-rail-actions{display:none}
 .sidebar-footer{border-top:0}.sidebar-section-heading{border:0}
 .sidebar .project-row,.sidebar .chat-row{border-radius:2px}
 .sidebar .project-main,.sidebar .chat-main{border-radius:0}
@@ -862,12 +857,12 @@ input:not([type=checkbox]),textarea,select{border-radius:var(--radius-control)}
 .settings-header{border-bottom:0}.settings-footer{border-top:0}
 @media(min-width:801px){
  .sidebar{background:transparent;border:0;border-radius:0;box-shadow:none}
- .sidebar-collapse-button,.desktop-sidebar-toggle{display:inline-flex}
+ .desktop-sidebar-toggle{display:inline-flex}
  .sidebar-collapsed .sidebar{width:56px;padding:24px 9px 18px}
  .sidebar-collapsed .sidebar-brand-row{padding:0 0 26px;justify-content:center;gap:0}
  .sidebar-collapsed .sidebar-brand-row .brand{flex:none;gap:0;width:29px}
- .sidebar-collapsed .brand>div,.sidebar-collapsed .sidebar-collapse-button,
- .sidebar-collapsed .sidebar-search,.sidebar-collapsed .sidebar-section-heading,
+ .sidebar-collapsed .brand>div,
+ .sidebar-collapsed .sidebar-section-heading,
  .sidebar-collapsed .project-tree,.sidebar-collapsed .sidebar-footer{display:none}
  .sidebar-collapsed .new-chat-button{font-size:0;width:36px;height:36px;padding:0;gap:0;display:grid;place-items:center}
  .sidebar-collapsed .new-chat-button>svg{color:var(--muted)}.sidebar-collapsed .new-chat-button kbd{display:none}

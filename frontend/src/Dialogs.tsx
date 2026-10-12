@@ -3,7 +3,8 @@ import {Icon,Spinner} from './Icon';
 
 export function Modal({title,subtitle,onClose,children,className='',dismissible=true}:{title:string;subtitle?:string;onClose:()=>void;children:ReactNode;className?:string;dismissible?:boolean}){
   const ref=useRef<HTMLDialogElement>(null);const titleId=useId();
-  useEffect(()=>{const dialog=ref.current;if(dialog&&!dialog.open)dialog.showModal();return()=>dialog?.close();},[]);
+  // 弹窗关闭后把键盘焦点还给触发入口，避免 Esc 后落到整页。
+  useEffect(()=>{const dialog=ref.current,previous=document.activeElement;if(dialog&&!dialog.open)dialog.showModal();return()=>{dialog?.close();if(previous instanceof HTMLElement&&previous.isConnected)previous.focus();};},[]);
   return <dialog ref={ref} className={'modal surface-panel '+className} aria-labelledby={titleId}
     onCancel={event=>{event.preventDefault();if(dismissible)onClose();}}
     onClick={event=>{if(dismissible&&event.target===ref.current){const rect=ref.current.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)onClose();}}}>

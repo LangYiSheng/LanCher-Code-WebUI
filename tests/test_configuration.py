@@ -88,3 +88,73 @@ def test_real_sdk_rule_scope_and_model_overrides_preserved(isolated):
                                 user_rules_path=home / '.lancher' / 'permissions.yaml')
     assert storage.rules_for_scope('project')[0].match == 'write_file:protected.txt'
     assert not (home / '.lancher' / 'permissions.yaml').exists()
+
+
+def test_mcp_remove_env_and_headers_preserves_masked_secrets_and_templates(isolated):
+    from lancher_code.mcp.config import load_mcp_config
+    root, home, project = isolated
+    config_path = home / '.lancher' / 'lancher.yaml'
+    original_config = config_path.read_bytes()
+    mcp_path = home / '.lancher' / 'mcp.yaml'
+    raw = {'mcp_servers': {
+        'stdio': {'type': 'stdio', 'command': 'python', 'args': ['-V'],
+                  'env': {'REMOVE': 'deleted-env-secret', 'KEEP': 'preserved-env-secret',
+                          'REF': '${MCP_FIXTURE_KEY}'}},
+        'http': {'type': 'http', 'url': 'http://127.0.0.1:9/mcp',
+                 'headers': {'X-Remove': 'deleted-header-secret', 'X-Keep': 'preserved-header-secret',
+                             'X-Ref': '${MCP_FIXTURE_KEY}'}},
+    }}
+    mcp_path.write_text(yaml.safe_dump(raw), encoding='utf-8')
+    service = ConfigurationService(root, user_home=home)
+    before = service.snapshot(project)
+    assert 'preserved-env-secret' not in json.dumps(before)
+    edited = copy.deepcopy(before['global_mcp'])
+    edited['stdio']['env'].pop('REMOVE')
+    edited['stdio']['env_remove'] = ['REMOVE']
+    edited['http']['headers'].pop('X-Remove')
+    edited['http']['headers_remove'] = ['X-Remove']
+    service.save({'domain': 'mcp', 'scope': 'global', 'revision': before['revision'], 'data': edited}, project)
+    saved = yaml.safe_load(mcp_path.read_text(encoding='utf-8'))['mcp_servers']
+    assert saved['stdio']['env'] == {'KEEP': 'preserved-env-secret', 'REF': '${MCP_FIXTURE_KEY}'}
+    assert saved['http']['headers'] == {'X-Keep': 'preserved-header-secret', 'X-Ref': '${MCP_FIXTURE_KEY}'}
+    assert 'env_remove' not in saved['stdio'] and 'headers_remove' not in saved['http']
+    assert config_path.read_bytes() == original_config
+    current = service.snapshot(project)
+    assert set(current['global_mcp']['stdio']['env']) == {'KEEP', 'REF'}
+    assert set(current['global_mcp']['http']['headers']) == {'X-Keep', 'X-Ref'}
+    assert 'preserved-header-secret' not in json.dumps(current)
+    configs, issues = load_mcp_config(project, home_dir=home, environ={'MCP_FIXTURE_KEY': 'expanded-test-value'})
+    assert not issues
+    actual = {server.name: server for server in configs}
+    assert actual['stdio'].env_template['REF'] == '${MCP_FIXTURE_KEY}'
+    assert actual['stdio'].env['REF'] == 'expanded-test-value'
+    assert actual['http'].headers_template['X-Ref'] == '${MCP_FIXTURE_KEY}'
+    assert actual['http'].headers['X-Ref'] == 'expanded-test-value'
+
+
+def test_mcp_explicit_empty_timeouts_restore_defaults_but_omission_preserves_old_values(isolated):
+    from lancher_code.mcp.config import validate_server_config
+    root, home, project = isolated
+    directory = project / '.lancher'
+    directory.mkdir()
+    path = directory / 'mcp.yaml'
+    timeouts = {'startup_timeout_seconds': 2.5, 'tool_timeout_seconds': 17.5, 'close_timeout_seconds': 3.5}
+    raw = {'mcp_servers': {name: {'type': 'stdio', 'command': 'python', 'args': [], **timeouts}
+                          for name in ('restore', 'retained')}}
+    path.write_text(yaml.safe_dump(raw), encoding='utf-8')
+    service = ConfigurationService(root, user_home=home)
+    before = service.snapshot(project)
+    edited = copy.deepcopy(before['project_mcp'])
+    for field in timeouts:
+        edited['restore'][field] = None
+        edited['retained'].pop(field)
+    service.save({'domain': 'mcp', 'scope': 'project', 'revision': before['revision'], 'data': edited}, project)
+    saved = yaml.safe_load(path.read_text(encoding='utf-8'))['mcp_servers']
+    assert set(timeouts).isdisjoint(saved['restore'])
+    assert {key: saved['retained'][key] for key in timeouts} == timeouts
+    restored = validate_server_config('restore', saved['restore'])
+    assert restored.startup_timeout_seconds is None and restored.close_timeout_seconds is None
+    assert restored.tool_timeout_seconds == 60.0
+    retained = validate_server_config('retained', saved['retained'])
+    assert (retained.startup_timeout_seconds, retained.tool_timeout_seconds, retained.close_timeout_seconds) == (2.5, 17.5, 3.5)
+    assert not (home / '.lancher' / 'mcp.yaml').exists()

@@ -152,6 +152,10 @@ def _restore_mcp(edited: dict, old: dict) -> dict:
             raise ConfigurationError("MCP 服务器配置必须是对象。")
         previous = old.get(identity, {})
         server = deepcopy({**previous, **value})
+        # 编辑器留空代表恢复 SDK 默认；省略字段则保留原配置。
+        for field in ("startup_timeout_seconds", "tool_timeout_seconds", "close_timeout_seconds"):
+            if field in value and value[field] is None:
+                server.pop(field, None)
         for field in ("env", "headers"):
             server.pop(field + "_configured", None)
             clear = server.pop(field + "_clear", [])

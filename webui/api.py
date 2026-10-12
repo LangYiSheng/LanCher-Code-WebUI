@@ -241,15 +241,6 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
                 else:yield f"id: {event['sequence']}\ndata: {json.dumps(event,ensure_ascii=False)}\n\n"
         return StreamingResponse(stream(),media_type='text/event-stream',headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
 
-    @app.get('/api/legacy')
-    async def legacy(request:Request):return manager(request).legacy()
-
-    @app.get('/api/legacy/{identity}')
-    async def legacy_detail(identity:str,request:Request):
-        result=manager(request).legacy(identity)
-        if result is None:raise WebError('历史记录不存在。',404)
-        return result
-
     @app.post('/api/shutdown')
     async def shutdown(request:Request):return await manager(request).shutdown()
 

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#111311">
+  <title>LanCher Agent Lab · 实验工作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231b201a'/%3E%3Cpath d='M20 18v28h25' fill='none' stroke='%23dfb77a' stroke-width='6'/%3E%3Ccircle cx='43' cy='21' r='5' fill='%23a6b88a'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script defer src="/assets/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="实验会话">
+      <a class="brand" href="/" aria-label="LanCher Agent Lab 首页">
+        <span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M9 7v18h17"/><circle cx="24" cy="8" r="3"/></svg></span>
+        <span class="brand-text">LanCher <strong>Agent Lab</strong></span>
+        <span class="lab-label">LAB</span>
+      </a>
+      <div class="sidebar-heading"><span>你的实验空间</span><span class="subtle">LOCAL</span></div>
+      <button class="new-session" id="new-session"><span aria-hidden="true">＋</span> 新建实验 <kbd>N</kbd></button>
+      <div class="session-list" id="session-list" role="navigation" aria-label="会话列表"></div>
+      <div class="sidebar-bottom">
+        <div class="boundary-card"><span class="boundary-icon" aria-hidden="true">◇</span><div><strong>独立实验环境</strong><p id="isolation-note">正在检查运行环境…</p></div></div>
+        <button class="sidebar-link" id="environment-button"><span aria-hidden="true">⌘</span> 环境与运行说明 <span aria-hidden="true">↗</span></button>
+        <div class="version-row"><span><i class="status-dot" id="server-dot"></i><span id="server-status">连接后端</span></span><span id="sdk-version">SDK —</span></div>
+      </div>
+    </aside>
+    <div class="sidebar-scrim" id="sidebar-scrim" hidden></div>
+    <main class="workspace">
+      <header class="workspace-header">
+        <div class="header-title"><button class="icon-button mobile-menu" id="mobile-menu" aria-label="打开会话列表">☰</button><span class="breadcrumb">工作台 <span>/</span></span><h1 id="session-title">开始一场新实验</h1></div>
+        <div class="header-actions"><span class="mode-badge" id="mode-badge">演示模型 · 真实 Agent</span><button class="icon-button" id="refresh-button" aria-label="刷新会话状态" title="刷新会话状态">↻</button></div>
+      </header>
+      <div class="workspace-body">
+        <section class="conversation" aria-label="Agent 对话与执行过程">
+          <div class="conversation-top"><div class="run-state"><i class="status-dot" id="run-dot"></i><span id="run-status">准备就绪</span><span class="run-detail" id="run-detail">每一步，都看得见。</span></div><button class="stop-button" id="stop-button" hidden><span aria-hidden="true">■</span> 停止任务</button></div>
+          <div class="global-error" id="global-error" role="alert" hidden><span id="error-text"></span><button class="icon-button" id="dismiss-error" aria-label="关闭错误提示">×</button></div>
+          <div class="timeline" id="timeline" tabindex="0">
+            <div class="welcome" id="welcome">
+              <div class="eyebrow"><span></span> A WORKSPACE FOR AGENTS</div>
+              <h2>把想法，交给 Agent。<br><em>把过程，留在眼前。</em></h2>
+              <p class="welcome-description">从一个需求，到一份能运行的代码。<br>在独立工作区，观察 LanCher 的每一次思考与工具执行。</p>
+              <div class="welcome-chips"><span><i></i> 真实 Agent SDK</span><span>流式事件</span><span>文件差异</span><span>可中断执行</span></div>
+              <div class="example-heading">先试一场实验 <span>选择后可以修改需求</span></div>
+              <div class="example-grid">
+                <button class="example-card" data-example="backend"><span class="example-icon">⌘</span><strong>从零构建后端</strong><p>创建 Todo API、写测试，再运行验证。</p><span class="example-arrow">↗</span></button>
+                <button class="example-card" data-example="repair"><span class="example-icon">⌁</span><strong>测试失败 → 自主修复</strong><p>观察工具报错，如何推动下一轮修复。</p><span class="example-arrow">↗</span></button>
+                <button class="example-card" data-example="permission"><span class="example-icon">◇</span><strong>让执行停在审批前</strong><p>检查命令，再决定允许或拒绝。</p><span class="example-arrow">↗</span></button>
+                <button class="example-card" data-example="cancel"><span class="example-icon">Ⅱ</span><strong>停止一项长任务</strong><p>验证取消、收尾与会话恢复。</p><span class="example-arrow">↗</span></button>
+              </div>
+              <p class="demo-note">默认使用确定性演示模型驱动真实 Agent，不调用在线模型。<br>所有工具结果与生成文件来自实际执行。</p>
+            </div>
+            <div id="message-list" aria-live="polite" aria-relevant="additions"></div>
+          </div>
+          <div class="queue-area" id="queue-area" hidden></div>
+          <div class="composer-area">
+            <form id="composer-form" class="composer">
+              <label for="prompt" class="sr-only">输入 Agent 任务</label><textarea id="prompt" rows="3" maxlength="20000" placeholder="描述你想完成的任务…" spellcheck="false"></textarea>
+              <div class="composer-bottom"><div class="composer-context"><span class="context-icon" aria-hidden="true">◇</span><span id="composer-context">独立工作区</span><span class="composer-shortcut">Ctrl ↵ 发送</span></div><button type="submit" id="send-button" class="send-button"><span id="send-label">发送任务</span><span aria-hidden="true">↑</span></button></div>
+            </form>
+            <div class="composer-footer"><span id="composer-hint">先选一个实验方向，或者直接输入你的任务。</span><span class="brand-sign">powered by LanCher</span></div>
+          </div>
+        </section>
+        <aside class="inspector" aria-label="文件与执行记录">
+          <div class="inspector-header"><div class="panel-tabs" role="tablist" aria-label="检查面板"><button class="panel-tab active" id="files-panel-tab" role="tab" aria-selected="true" aria-controls="files-panel" data-panel="files">工作区 <span id="file-count">0</span></button><button class="panel-tab" id="logs-panel-tab" role="tab" aria-selected="false" aria-controls="logs-panel" data-panel="logs">执行日志</button></div><button class="icon-button" id="reload-files" title="刷新文件" aria-label="刷新文件">↻</button></div>
+          <div class="inspector-panel" id="files-panel" role="tabpanel" aria-labelledby="files-panel-tab">
+            <div class="workspace-path"><span aria-hidden="true">▱</span><span id="workspace-path" title="会话工作目录">尚未创建工作区</span></div>
+            <div class="file-tree" id="file-tree"><div class="empty-files"><span aria-hidden="true">▱</span><p>Agent 生成的文件<br>会出现在这里。</p></div></div>
+            <div class="file-preview" id="file-preview"><div class="preview-header"><span class="file-preview-name" id="preview-name">文件预览</span><div class="preview-tabs" role="tablist" aria-label="文件视图"><button id="content-tab" class="active" role="tab" aria-selected="true" data-view="content">源码</button><button id="diff-tab" role="tab" aria-selected="false" data-view="diff">差异</button></div></div><div id="code-view" class="code-view"><div class="preview-empty"><span>⌘</span><p>选择一个文件，<br>看看 Agent 写了什么。</p></div></div></div>
+          </div>
+          <div class="inspector-panel" id="logs-panel" role="tabpanel" aria-labelledby="logs-panel-tab" hidden><div class="logs-heading"><span>事件与命令输出</span><span id="event-count">0 EVENTS</span></div><div class="log-list" id="log-list"><div class="panel-empty">真实执行事件将在这里逐条记录。</div></div></div>
+          <div class="usage-panel"><div class="usage-title"><span>本次运行</span><span id="usage-state">等待任务</span></div><div class="usage-grid"><div><span id="input-tokens">—</span><small>输入 TOKENS</small></div><div><span id="output-tokens">—</span><small>输出 TOKENS</small></div><div><span id="tool-count">0</span><small>工具调用</small></div></div><div class="event-connection"><span><i id="stream-dot" class="status-dot"></i><span id="stream-status">等待会话</span></span><span id="event-sequence">SEQ 0</span></div></div>
+        </aside>
+      </div>
+    </main>
+  </div>
+  <div class="toast-container" id="toast-container" role="status" aria-live="polite"></div>
+  <dialog id="new-dialog" class="modal">
+    <form id="new-session-form"><div class="modal-top"><span class="eyebrow">NEW EXPERIMENT</span><button type="button" class="icon-button" data-close="new-dialog" aria-label="关闭新建窗口">×</button></div><h2>给实验一块新画布。</h2><p class="modal-description">每个会话都有自己的文件、事件与运行状态。</p><label class="field-label" for="new-title">实验名称 <span>可选</span></label><input id="new-title" maxlength="80" placeholder="例如：Todo 后端构建实验"><div class="field-label">运行方式</div><div class="mode-options"><label class="mode-option"><input type="radio" name="mode" value="demo" checked><span><strong>演示模型 · 真实 Agent</strong><small>确定性流程，不产生模型费用</small></span><span class="recommended">推荐先体验</span></label><label class="mode-option" id="live-option"><input type="radio" name="mode" value="live" id="live-radio"><span><strong>在线模型</strong><small id="live-note">读取实验环境的模型配置</small></span></label></div><div id="model-field" hidden><label class="field-label" for="new-model">选择模型</label><select id="new-model"></select></div><div class="modal-footer"><button type="button" class="secondary-button" data-close="new-dialog">取消</button><button type="submit" class="primary-button" id="create-button">创建实验 <span>↗</span></button></div></form>
+  </dialog>
+  <dialog id="environment-dialog" class="modal environment-modal"><div class="modal-top"><span class="eyebrow">EXPERIMENT ENVIRONMENT</span><button class="icon-button" data-close="environment-dialog" aria-label="关闭环境说明">×</button></div><h2>一块独立的试验田。</h2><p class="modal-description">浏览器只负责交互，后端持续运行 Agent。刷新页面可以继续查看过程。</p><dl id="environment-details"></dl><div class="environment-note">演示模式使用固定响应的模型提供方，经过真实 SDK 的事件、工具与审批链路。接入在线模型后，任务内容由所选模型自主处理。</div><div class="modal-footer"><button class="primary-button" data-close="environment-dialog">知道了</button></div></dialog>
+  <noscript>请启用 JavaScript 以使用 Agent 工作台。</noscript>
+</body>
+</html>
+

@@ -1,19 +1,39 @@
+[CmdletBinding()]
+param()
 $ErrorActionPreference = 'Stop'
-$labRoot = $PSScriptRoot
-$labPython = Join-Path $labRoot '.venv\Scripts\python.exe'
-$wheelPath = Join-Path $labRoot 'vendor\wheels\lancher_code-0.1.0-py3-none-any.whl'
-if(-not (Test-Path -LiteralPath $wheelPath)){ throw '缺少固定 SDK wheel，请恢复 vendor/wheels，不能链接原仓库。' }
-$snapshot = Get-Content -Raw -LiteralPath (Join-Path $labRoot 'vendor\snapshot.json') | ConvertFrom-Json
-if($snapshot.wheel_sha256 -and (Get-FileHash -Algorithm SHA256 -LiteralPath $wheelPath).Hash.ToLower() -ne $snapshot.wheel_sha256){ throw 'SDK wheel 校验失败。' }
-Push-Location -LiteralPath $labRoot
-try {
-    if(-not (Test-Path -LiteralPath $labPython)) {
-        uv venv (Join-Path $labRoot '.venv') --python 3.14
-        if($LASTEXITCODE -ne 0){throw '创建环境失败'}
+$taskProject = $PSScriptRoot
+Set-Location -LiteralPath $taskProject
+$taskPidPath = Join-Path $taskProject 'data\webui.pid.json'
+if (Test-Path -LiteralPath $taskPidPath) {
+    $taskPid = Get-Content -LiteralPath $taskPidPath -Raw | ConvertFrom-Json
+    if (Get-Process -Id $taskPid.process_id -ErrorAction SilentlyContinue) {
+        throw '先运行 .\stop.ps1 停止本项目服务，再更新依赖，避免 Windows 锁定正在使用的扩展模块。'
     }
-    uv pip install --python $labPython --link-mode copy -r requirements.lock.txt
-    if($LASTEXITCODE -ne 0){throw '安装依赖失败'}
-    docker pull python:3.14-slim
-    if($LASTEXITCODE -ne 0){ Write-Warning 'Docker 不可用，工作台可以启动，但不会在宿主机执行生成代码。' }
+}
+$taskUv = Get-Command uv -ErrorAction Stop
+$taskPython = Join-Path $taskProject '.venv\Scripts\python.exe'
+if (-not (Test-Path -LiteralPath $taskPython)) {
+    & $taskUv.Source venv --python 3.14 .venv
+    if ($LASTEXITCODE -ne 0) { throw '创建独立 Python 环境失败。' }
+}
+$taskManifest = Get-Content -LiteralPath (Join-Path $taskProject 'vendor\snapshot.json') -Raw | ConvertFrom-Json
+$taskWheel = Join-Path $taskProject $taskManifest.wheel
+if ((Get-FileHash -LiteralPath $taskWheel -Algorithm SHA256).Hash.ToLowerInvariant() -ne $taskManifest.wheel_sha256) {
+    throw 'SDK wheel 的 SHA256 与 vendor/snapshot.json 不一致，未安装。'
+}
+# 只同步本项目锁定依赖，不更新用户的 TUI 环境，不强制重装全部包。
+& $taskUv.Source pip sync --python $taskPython requirements.lock.txt
+if ($LASTEXITCODE -ne 0) { throw '安装锁定 Python 依赖失败。' }
+# 版本号相同的 SDK 快照也必须更新，只重装这一份已校验 wheel。
+& $taskUv.Source pip install --python $taskPython --no-deps --reinstall $taskWheel
+if ($LASTEXITCODE -ne 0) { throw '安装固定 SDK wheel 失败。' }
+& $taskUv.Source pip check --python $taskPython
+if ($LASTEXITCODE -ne 0) { throw 'Python 依赖兼容性检查失败。' }
+Push-Location -LiteralPath (Join-Path $taskProject 'frontend')
+try {
+    & npm.cmd ci
+    if ($LASTEXITCODE -ne 0) { throw '安装前端锁定依赖失败。' }
+    & npm.cmd run build
+    if ($LASTEXITCODE -ne 0) { throw '前端构建失败。' }
 } finally { Pop-Location }
-
+Write-Output '安装完成。运行 .\start.ps1 启动 LanCher Code WebUI。'

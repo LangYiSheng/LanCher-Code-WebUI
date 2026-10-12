@@ -1,59 +1,73 @@
-# LanCher Agent Lab
+# LanCher Code WebUI
 
-独立的本地 Agent 工作台，直接调用固定快照的 `lancher_code.sdk`。当前 LanCher Code 仓库不参与运行，不共用虚拟环境、配置、权限、Skills、MCP 或会话。
+本机浏览器里的 LanCher Code 工作台。后端直接使用固定快照 SDK 的原生文件、搜索、命令、会话、审批、Skills 和 MCP 能力；模型自主调用工具，不使用固定生成脚本。React 页面显示项目、对话、工具轨迹、文件差异、进程、设置和用量。工作台以项目侧栏、聊天正文和任务检查器组织信息，使用轻雾背景与统一圆角，支持浅色、深色与窄屏。工具调用、结果与命令使用 Lucide 语义图标，品牌和欢迎入口的 LC 标识随主题变色，助手消息使用 Sparkles 图标与 LanCher 名称。
 
-## 启动
+## 安装与运行
+
+需要 Windows PowerShell、Python 3.14、uv、Node.js 与 npm。Python 与前端依赖均安装到本目录，不复用原 LanCher Code 开发环境。
 
 ```powershell
-cd 'D:\Dev\LanCher Agent Lab'
-.\start.ps1
+.\setup.ps1
+.\start.ps1 -OpenBrowser
+.\stop.ps1
 ```
 
-打开 http://127.0.0.1:8765 。`start.ps1 -Port 8766` 可更换端口。端口只监听本机；跨站浏览器请求被拒绝。
+默认地址为 `http://127.0.0.1:8765`；可使用 `start.ps1 -Port 8770`。服务只监听本机。启动脚本记录自己的 PID；停止脚本核验进程身份后调用服务关闭接口，等待 Agent 与托管进程完成收尾。强制终止需要显式 `stop.ps1 -Force`。
 
-已有 `.venv` 可直接启动。重建环境用 `setup.ps1`，需要 Python 3.14、uv 和已运行的 Docker Desktop。它安装 `vendor/wheels` 中固定并校验 SHA256 的 SDK wheel，不链接原项目。首次运行需要 `docker pull python:3.14-slim`；依赖版本记录在 `requirements.lock.txt`。
-
-## 可以试什么
-
-- 新建演示会话，发送“从零创建一个 Todo 后端并运行测试”。Agent 会生成 app.py、HTTP 接口测试和 README，测试执行需要在网页审批。
-- 发送“故意失败再修复后端”，观察第一次 HTTP 测试失败、Agent 修改文件、第二次测试通过。
-- 发送“慢慢运行，我要测试停止”，运行中追加任务、关闭页面重连或按停止，检查队列暂停与恢复。
-- 发送“测试审批”，拒绝请求。工具不会执行，并记录真实的 SDK 拒绝结果。
-- 查看文件、代码差异、工具输出、审批、会话和模型用量。演示模型没有真实 token 计费，未知用量保持未知。
-
-演示模式使用确定性的本地 Provider，经过真实 SDK 的模型响应解析、工具执行、审批、事件、会话和取消流程。它用于可重复验收，不评价模型自主编程能力。在线模式使用 `data/model.yaml` 中的真实供应商与模型，可直接提交自己的编程任务；配置已从当前有效配置复制成独立副本，修改它不会改原配置。密钥只在后端，文件与运行数据全部被 Git 忽略。
-
-## 执行边界
-
-宿主没有注册任意 Shell。文件工具逐次限制到当前实验目录，拒绝绝对路径、父目录、隐藏元数据、符号链接和目录连接。用户即使批准越界访问，适配器仍拒绝实际 I/O。
-
-`run_tests` 只执行固定入口 `python -m unittest discover -s tests -v`。它先复制可见项目文件，再用 Docker 只读挂载副本；不挂载原仓库、SDK 状态、模型配置或 Docker socket，不传入模型密钥。容器关闭网络和持久化日志、使用只读根文件系统、删除 Linux capabilities、限制内存/CPU/进程数，允许容量受限的临时内存目录，45 秒后终止。没有 Docker 时明确报错，不在宿主机执行生成代码。工具拒绝和测试失败都作为事件返回，任务完成不等于测试通过。
-
-## 架构
-
-浏览器通过 HTTP 提交操作，通过 SSE 接收后端持久化事件。后端独立 asyncio Task 持续消费 Agent，页面断线不会取消任务。SDK 事件序号被保留为 sdk_sequence，宿主 sequence 跨启动递增；Last-Event-ID/after 用于重放。
-
-一个实验会话一个 Agent 实例与专用 workspace；会话内串行，最多 4 个会话并行。成功后 SDK 推进 follow-up 队列，失败/取消暂停队列。关闭服务先停止任务、清理容器、保存 SDK 会话并释放锁。重启恢复历史，不自动重放中断任务。通过“恢复”继续暂停队列。
-
-主要目录：
-
-- `lab/`：Web API、任务管理、受限工具、演示 Provider。
-- `web/`：无需构建的浏览器界面。
-- `tests/`：SDK/API 生命周期与隔离检查。
-- `scripts/acceptance.py`：真实 SDK + Docker 的端到端验收。
-- `vendor/snapshot.json`：固定的 SDK commit。
-- `vendor/wheels/`：固定 SDK 安装包，可直接复现。
-- `vendor/sdk-src/`：只读来源快照，保留作分析参考，不纳入此实验 Git。
-- `data/`：私有配置、实验文件、SDK 会话、Web 事件和验收证据。
-
-## 检查
+前台诊断可使用：
 
 ```powershell
+.\.venv\Scripts\python.exe -m webui --port 8765
+```
+
+`setup.ps1` 校验 `vendor/snapshot.json` 指定 wheel 的 SHA256，再同步 `requirements.lock.txt` 与前端锁文件。SDK 只安装 `vendor/wheels/current/` 的固定 wheel，不采用 editable 安装，也不从原仓库的未提交代码构建。升级依赖前应先停止本项目服务，避免 Windows 锁定正在使用的扩展模块。
+
+## 项目、任务与会话
+
+添加项目时选择本机真实目录。Agent 的文件与命令工具在该项目目录工作，修改会落到所选工程；访问范围由 SDK 的 `read_only`、`project`、`full` 权限模式及审批决定。权限模式属于应用层检查。运行不依赖 Docker。
+
+新建空白对话先作为草稿保留，浏览器保存草稿身份、输入和控制选项，后端不登记正式历史，也不创建 SDK 会话。首次有效任务被接受时即登记正式对话，包括尚在项目队列中等待的任务；取消或供应商失败不会丢掉已接受的首条任务。
+
+同一个项目的前台任务按提交顺序执行，不同项目可以并行。当前会话运行时，可以追加 follow_up 或 steer 输入；队列可以编辑、移除、改变类型、暂停和恢复。成功完成后会把未暂停的 follow_up 排回项目队尾，让已经排队的其他会话先运行；steer 保持在本轮。取消或失败会暂停队列，人工暂停空队列后追加的输入也保持暂停。
+
+浏览器刷新或断开连接不会停止任务。页面重新取得状态并按事件游标补回消息。停止本轮与停止整个会话分别处理本轮资源和跨轮次托管进程。`lifetime=session` 的后台命令可以跨轮次继续运行，进程面板可读日志、写输入、转后台或停止。
+
+检查器采用左侧内容预览、右侧目录树，顶部标签可以关闭或通过“+”选择项目文件、对话变更、运行、进程和用量。边缘分隔条支持拖动与键盘调整宽度，窄屏改为覆盖面板。
+
+检查器分别提供“项目文件”和“本对话变更”：项目文件用于浏览当前工程源码；变更按当前对话原生文件工具首次编辑前的文本基线判断，只列新增、修改和删除。恢复原文、新增后又删除都会回到无净变化。Shell 命令和 TUI 旧历史没有这份 Web 基线，不会被误算为当前对话的修改。
+
+会话沿用 `项目目录/.lancher/sessions/<UUID>`，可以由 TUI 与 WebUI 轮流使用。同一会话写入锁阻止两个宿主同时修改历史；在 WebUI 释放会话后，再在 TUI 中恢复。重新加载时读取原生 SDK 历史，不自动重放旧工具。固定 00e0797 SDK 没有原生取消归档接口：网页“恢复”恢复 Web 导航，SDK 的 archived 标记保留；TUI 仍可按 UUID 恢复这份完整历史。宿主不会编造 SDK 历史事件。
+
+## 共用配置与设置
+
+模型目录共用用户的 `~/.lancher/lancher.yaml`。MCP 共用 `~/.lancher/mcp.yaml` 与项目 `.lancher/mcp.yaml`；权限规则共用相应 `permissions.yaml`。Skills 由 SDK 按项目和用户范围加载。
+
+网页设置区将常用设置与高级参数分组，模型独立连接、继承和思考参数可按需展开；密钥是否已配置及留空保留状态会明确显示。页面同时显示作用范围和配置修订号。保存全局配置会影响 TUI；项目配置只作用于当前项目。修订冲突时重新载入，避免覆盖其他窗口的更新。忙时的模型或配置变更等待安全时机应用。API 不把保存的密钥原文发给页面。
+
+模型和设置使用主题一致的下拉菜单，支持键盘选择。新增、改名与确认操作使用应用内弹窗，显示具体对象和待执行动作。
+
+输入框输入 `/` 查看当前完整命令目录及补全。命令由 Web 宿主派发到 SDK 控制接口或对应设置页面，不交给模型当作普通文本。
+
+用量分为本次回答、会话、项目与服务。实际请求账本包含队列、用户恢复重试和压缩；未上报字段保持未知，缓存命中率使用 SDK 对完整有效上报的计算结果。底部用量按钮支持鼠标悬停、键盘聚焦或点击打开内置统计浮层；圆环单独显示当前上下文占模型容量的比例，累计 token 消耗与当前上下文分开统计。
+
+释放后的历史会话通过只读 SDK 投影估算上下文，不创建 Agent、不取得会话写入锁。即使 TUI 正持有同一 UUID，网页仍可查看保存快照。来源会区分本地估算与提供方校准估算，不能估算的字段保持未知。
+
+## 验证与证据
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE='1'
 .\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider
-.\.venv\Scripts\python.exe scripts\acceptance.py
+.\.venv\Scripts\python.exe .\scripts\acceptance.py --url http://127.0.0.1:8765
 ```
 
-接口文档： http://127.0.0.1:8765/docs 。验收证据保存在 `data/acceptance.json`；当前验收结论另见 `ACCEPTANCE.md`。
+自动化测试使用临时模型配置、临时用户目录和临时项目；模型边界使用注入 Provider 或本机真实 HTTP/SSE 服务。原生工具、会话与进程按真实 SDK 路径运行；测试不会写入真实用户配置或原开发仓库。在线验收只在 `data/acceptance_projects/` 的专用工程调用真实模型，结果另行保存。当前完整通过 47 项后端自动化、25 项前端测试，两个真实在线项目共 16 项 HTTP 测试通过；最终实际浏览器验收覆盖浅暗主题、390px 窄屏、检查器调整、键盘下拉菜单、草稿刷新与服务重启恢复，详细证据和验证边界见 [ACCEPTANCE.md](ACCEPTANCE.md)。
 
+## 目录与历史备份
 
+- `webui/`：后端、共享配置适配、调度和事件传输。
+- `frontend/`：React 页面与构建输出。
+- `vendor/wheels/current/`、`vendor/snapshot.json`：固定 SDK 及哈希。
+- `data/`：Web 专属状态、日志和验收证据，Git 忽略。
+- `data/legacy/data/`：旧实验数据备份。
 
+旧 `D:\Dev\LanCher Agent Lab` 因仍有文件句柄而未改名，保留为历史备份；旧后端和前端不作为本项目运行入口。原 `D:\Dev\LanCher Code` 保持独立，本项目不写其代码、依赖环境或 Git 状态。

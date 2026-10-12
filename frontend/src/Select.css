@@ -1,0 +1,25 @@
+.custom-select{display:inline-block;max-width:100%;min-width:0;vertical-align:middle}
+.select-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-width:0;border:1px solid var(--border);background:var(--canvas);border-radius:var(--radius-control,6px);padding:9px 11px;font-size:12px;line-height:1.5;text-align:left}
+.select-trigger:hover:not(:disabled){background:var(--surface)}
+.select-trigger[aria-expanded=true]{border-color:var(--subtle);background:var(--surface)}
+.select-trigger:disabled{opacity:.5}
+.select-value{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;flex:1}
+.select-trigger>svg{color:var(--muted);flex-shrink:0}
+.select-popup{position:fixed;z-index:120;overflow:auto;padding:6px;color:var(--text);background:var(--canvas);border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 24px #20304022;font:12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+:root[data-theme=dark] .select-popup{box-shadow:0 6px 24px #0006}
+.select-option{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:6px;cursor:pointer;min-height:34px}
+.select-option>span{min-width:0;overflow-wrap:anywhere}
+.select-option[data-active=true]{background:var(--surface-hover)}
+.select-option[aria-selected=true]{color:var(--blue)}
+.select-option.disabled{color:var(--subtle);cursor:default}
+.select-option>svg{flex-shrink:0}
+.settings-field>.custom-select,.model-selector>.custom-select{width:100%}
+.settings-field>.custom-select>.select-trigger{background:var(--canvas);font-size:12px;padding:10px 11px}
+.model-selector>.custom-select{flex:1}
+.custom-select.full-select{width:100%;padding:0;border:0;background:none}
+.composer-left .custom-select,.composer-right .custom-select{max-width:150px;min-width:0}
+.composer-left .select-trigger,.composer-right .select-trigger{background:transparent;border:0;padding:5px 6px;min-height:28px;font-size:11px;color:var(--muted);gap:7px}
+.composer-left .select-trigger:hover:not(:disabled),.composer-right .select-trigger:hover:not(:disabled){background:var(--surface-hover)}
+.composer-left .custom-select:first-of-type{max-width:200px}
+@media(max-width:1200px){.composer-left .custom-select,.composer-right .custom-select{max-width:110px}.composer-left .select-trigger,.composer-right .select-trigger{font-size:10px;padding:5px 4px;gap:5px}}
+@media(max-width:600px){.composer-left .custom-select,.composer-right .custom-select{max-width:100px}.settings-field>.custom-select>.select-trigger{font-size:11px;padding:9px}}

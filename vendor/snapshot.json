@@ -1,7 +1,6 @@
 {
-  "commit": "b39a6cd62642f7be0a70bff5f3372721d29658da",
-  "snapshot_date": "2026-10-12T14:25:30.8221726+08:00",
-  "source": "LanCher Code",
-  "wheel": "vendor/wheels/lancher_code-0.1.0-py3-none-any.whl",
-  "wheel_sha256": "86076bbcf86af100411f314e262a090fc2f85116444e2ddeb18e2e609c320055"
+  "wheel": "vendor/wheels/current/lancher_code-0.1.0-py3-none-any.whl",
+  "wheel_sha256": "e14fff48bfab4639dfdb1a4ff35a93780a5da296ff186b6e9c8dc2d95360b778",
+  "legacy_source": "D:\\Dev\\LanCher Agent Lab",
+  "commit": "00e079718869c75343dbc629b0cfd6ee084ac6fa"
 }

@@ -1,0 +1,35 @@
+import {useEffect,useId,useRef,useState} from 'react';
+import type {ChatDetail} from './types';
+import {num} from './api';
+import {Icon} from './Icon';
+import {contextSummary,PARTIAL_LABELS,usageSummary,USAGE_SCOPES,type TokenField,type UsageScope} from './usage';
+
+function ContextMeter({context}:{context:ChatDetail['context']|undefined}){
+  const data=contextSummary(context);const fill=data.ratio===null?null:Math.min(100,Math.max(0,data.ratio*100));
+  return <span className={'context-meter '+(fill===null?'unknown':data.ratio!>=1?'full':data.ratio!>=.9?'near':'')} role="img" aria-label={data.label}>
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle className="context-meter-track" cx="10" cy="10" r="7" fill="none" strokeWidth="2.3" strokeDasharray={fill===null?'2 3':undefined}/>{fill!==null&&<circle className="context-meter-value" cx="10" cy="10" r="7" fill="none" strokeWidth="2.3" pathLength="100" strokeDasharray={`${fill} 100`} transform="rotate(-90 10 10)"/>}</svg><span>{data.percent===null?'—':data.percent+'%'}</span>
+  </span>;
+}
+export function UsagePopover({chat,onInspect}:{chat?:ChatDetail;onInspect:()=>void}){
+  const [open,setOpen]=useState(false);const [scope,setScope]=useState<UsageScope>('answer');
+  const root=useRef<HTMLDivElement>(null);const trigger=useRef<HTMLButtonElement>(null);const pinned=useRef(false);const hovered=useRef(false);const timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);const tabs=useRef<(HTMLButtonElement|null)[]>([]);const id=useId();
+  const answer=usageSummary(chat?.usage,'answer');const current=usageSummary(chat?.usage,scope);const context=contextSummary(chat?.context);
+  function cancelClose(){clearTimeout(timer.current);}
+  function close(){cancelClose();pinned.current=false;trigger.current?.focus();setOpen(false);}
+  function deferClose(){cancelClose();timer.current=setTimeout(()=>{if(!pinned.current&&!hovered.current&&!root.current?.contains(document.activeElement))setOpen(false);},120);}
+  useEffect(()=>()=>clearTimeout(timer.current),[]);
+  useEffect(()=>{if(!open)return;const outside=(event:PointerEvent)=>{if(event.target instanceof Node&&!root.current?.contains(event.target)){pinned.current=false;hovered.current=false;setOpen(false);}};const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();pinned.current=false;trigger.current?.focus();setOpen(false);}};document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);};},[open]);
+  const footerValue=(key:TokenField)=>num(answer.tokens[key])+(answer.tokens[key]!==null&&answer.isPartial(key)?'*':'');
+  const ariaValue=(key:TokenField)=>(answer.tokens[key]!==null&&answer.isPartial(key)?'已知小计 ':'')+num(answer.tokens[key]);
+  const rows:[TokenField|'total_tokens',string][]=[['input_tokens','输入'],['output_tokens','输出'],['total_tokens','总量'],['cached_input_tokens','缓存读取'],['cache_creation_input_tokens','缓存创建'],['reasoning_output_tokens','推理输出']];
+  return <div className="status-usage" ref={root} onMouseEnter={()=>{hovered.current=true;cancelClose();setOpen(true);}} onMouseLeave={()=>{hovered.current=false;deferClose();}} onFocus={()=>{cancelClose();setOpen(true);}} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))deferClose();}}>
+    <button ref={trigger} type="button" className="status-usage-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls={open?id:undefined} aria-label={`查看用量，输入 ${ariaValue('input_tokens')}，输出 ${ariaValue('output_tokens')}，缓存 ${ariaValue('cached_input_tokens')}；${context.label}`} onClick={()=>{cancelClose();if(pinned.current){pinned.current=false;setOpen(false);}else{pinned.current=true;setOpen(true);}}}>
+      <ContextMeter context={chat?.context}/><span className="usage-footer-stat"><span>输入</span> {footerValue('input_tokens')}</span><span className="usage-footer-separator">·</span><span className="usage-footer-stat"><span>输出</span> {footerValue('output_tokens')}</span><span className="usage-footer-separator">·</span><span className="usage-footer-stat"><span>缓存</span> {footerValue('cached_input_tokens')}</span>
+    </button>
+    {open&&<section id={id} className="usage-popover" role="dialog" aria-label="用量详情"><header><div><Icon name="activity" size={15}/><strong>用量详情</strong></div><button type="button" className="icon-button" aria-label="关闭用量详情" onClick={close}><Icon name="close" size={15}/></button></header>
+      <div className="usage-popover-tabs" role="tablist" aria-label="用量统计范围" onKeyDown={event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const index=USAGE_SCOPES.findIndex(([key])=>key===scope);const next=event.key==='Home'?0:event.key==='End'?3:(index+(event.key==='ArrowRight'?1:-1)+4)%4;setScope(USAGE_SCOPES[next][0]);tabs.current[next]?.focus();}}>{USAGE_SCOPES.map(([key,label],index)=><button type="button" key={key} ref={node=>{tabs.current[index]=node;}} role="tab" id={id+'-'+key} aria-selected={scope===key} aria-controls={id+'-panel'} tabIndex={scope===key?0:-1} className={scope===key?'active':''} onClick={()=>setScope(key)}>{label}</button>)}</div>
+      <div role="tabpanel" id={id+'-panel'} aria-labelledby={id+'-'+scope} className="usage-popover-panel"><div className="usage-popover-quality"><span className={current.state}>{current.quality}</span>{!current.isFinal&&current.state!=='incomplete'&&<span>上报未完成</span>}<small>tokens</small></div><dl className="usage-popover-metrics">{rows.map(([key,label])=>{const value=key==='total_tokens'?current.total:current.tokens[key];const subtotal=key==='total_tokens'?null:current.knownSubtotal(key);const partial=key==='total_tokens'?current.totalPartial:current.isPartial(key);return <div key={key}><dt>{label}</dt><dd>{num(value)}{value!==null&&partial?<small>已知小计</small>:subtotal!==null&&<small>已知小计 {num(subtotal)}</small>}</dd></div>;})}</dl><dl className="usage-popover-meta"><div><dt>请求</dt><dd>{num(current.requestCount)}</dd></div><div><dt>缓存命中率</dt><dd>{current.cacheHitRatio===null?'—':(current.cacheHitRatio*100).toFixed(1)+'%'}</dd></div><div><dt>不完整 / 无效上报</dt><dd>{num(current.incomplete)} / {num(current.invalid)}</dd></div></dl>{current.partial.length>0&&<p className="usage-popover-note">未知字段：{current.partial.map(key=>PARTIAL_LABELS[key]||key).join('、')}</p>}<p className="usage-popover-note">总量仅为输入加输出。缓存属于输入，推理属于输出；— 表示未知，* 表示已知小计。</p></div>
+      <div className="usage-popover-context"><div><strong>当前上下文</strong><ContextMeter context={chat?.context}/></div><dl><div><dt>容量占用</dt><dd>{num(context.tokens)} / {num(context.window)}</dd></div><div><dt>统计来源</dt><dd>{context.source}</dd></div></dl>{context.snapshot&&<p className="usage-popover-note">来自持久会话快照，运行后的上下文可能已变化。</p>}</div><footer><span>鼠标悬停或键盘聚焦可查看</span><button type="button" className="text-button" onClick={()=>{pinned.current=false;setOpen(false);onInspect();}}><Icon name="panel" size={13}/>在检查器中查看</button></footer>
+    </section>}
+  </div>;
+}

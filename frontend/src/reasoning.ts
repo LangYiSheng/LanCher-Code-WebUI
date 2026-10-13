@@ -1,5 +1,5 @@
 import type {ChatSummary} from './types.ts';
-export const EFFORT_LABELS:Record<string,string>={auto:'自动',low:'低 · 更快',medium:'中 · 均衡',high:'高 · 深入',xhigh:'很高',max:'最高'};
+export const EFFORT_LABELS:Record<string,string>={auto:'自动',minimal:'极低',low:'低',medium:'中',high:'高',xhigh:'很高',max:'最高',ultra:'极高'};
 export const API_MODES=[['auto','自动'],['chat_completions','标准聊天'],['chat_completions_legacy','兼容聊天'],['responses','Responses']] as const;
 // 只呈现核心为当前连接返回的档位；没有加载能力时仅提供 auto。
 export function effortOptions(chat:Pick<ChatSummary,'effort_levels'>|undefined){

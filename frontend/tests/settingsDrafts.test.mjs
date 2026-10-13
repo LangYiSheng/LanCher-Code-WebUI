@@ -268,3 +268,114 @@ test('raw文本修正后不会写入payload，未完成文本的外部冲突不�
   assert.equal(JSON.stringify(ticket.payload).includes('[ ]'),false);
   assert.equal(ticket.editors.command_profiles.text,'[ ]');
 });
+
+const validationError=issues=>Object.assign(new Error('请修正标出的设置。'),{status:400,data:{issues}});
+test('字段校验问题跨分类保留，编辑只清除实际修改字段的错误',()=>{
+  const drafts=store(),models=key('models');
+  drafts.setIssues(models,[{domain:'models',path:['providers','p','name'],message:'名称错误'},
+    {domain:'models',path:['providers','p','base_url'],message:'URL错误'}]);
+  drafts.get(key('ui'));
+  drafts.edit(models,value=>({...value,providers:{...value.providers,p:{...value.providers.p,api_mode:'responses'}}}));
+  assert.equal(drafts.get(models).issues.length,2);
+  drafts.edit(models,value=>({...value,providers:{...value.providers,p:{...value.providers.p,name:'repaired'}}}));
+  assert.deepEqual(drafts.get(models).issues.map(issue=>issue.path.at(-1)),['base_url']);
+  drafts.edit(models,value=>({...value,providers:{...value.providers,p:{...value.providers.p,base_url:'https://repaired.invalid/v1'}}}));
+  assert.deepEqual(drafts.get(models).issues,[]);assert.equal(drafts.get(models).error,'');
+});
+
+test('迟到失败只标出提交后仍未修改的字段，已修正字段不再标红',()=>{
+  const drafts=store(),models=key('models');
+  drafts.edit(models,value=>({...value,providers:{...value.providers,p:{...value.providers.p,name:'submitted'}}}));
+  const ticket=drafts.beginSave(models);
+  drafts.edit(models,value=>({...value,providers:{...value.providers,p:{...value.providers.p,name:'repaired-after-submit'}}}));
+  drafts.failed(ticket,validationError([{domain:'models',path:['providers','p','name'],message:'旧名称错误'},
+    {domain:'models',path:['providers','p','base_url'],message:'URL仍错误'}]));
+  assert.deepEqual(drafts.get(models).issues.map(issue=>issue.message),['URL仍错误']);
+  assert.equal(drafts.get(models).value.providers.p.name,'repaired-after-submit');
+  assert.equal(drafts.get(models).saving,false);
+  const second=drafts.beginSave(models);
+  drafts.edit(models,value=>({...value,providers:{...value.providers,p:{...value.providers.p,base_url:'https://fresh.invalid/v1'}}}));
+  drafts.failed(second,validationError([{domain:'models',path:['providers','p','base_url'],message:'旧URL错误'}]));
+  assert.deepEqual(drafts.get(models).issues,[]);assert.equal(drafts.get(models).error,'');
+});
+
+test('迟到非结构化错误不污染新编辑，409仍保留整页冲突',()=>{
+  const drafts=store(),runtime=key('runtime');
+  const first=drafts.beginSave(runtime);drafts.edit(runtime,{tool_loop_limit:60});drafts.failed(first,new Error('old failure'));
+  assert.equal(drafts.get(runtime).error,'');
+  const second=drafts.beginSave(runtime);drafts.edit(runtime,{tool_loop_limit:61});drafts.failed(second,Object.assign(new Error('conflict'),{status:409}));
+  assert.equal(drafts.get(runtime).conflict,true);assert.match(drafts.get(runtime).error,/配置已更新/);
+});
+
+test('坏领域读取保留已有草稿并禁存，首次读取缺数据不伪造空领域',()=>{
+  const drafts=store(),mcp=key('mcp');
+  drafts.edit(mcp,value=>({...value,new:{type:'stdio',command:'local-command'}}));
+  const before=drafts.get(mcp).value,broken=snapshot('global-broken');delete broken.global_mcp;
+  broken.domain_errors={global_mcp:[{domain:'mcp',path:[],message:'MCP文件无法解析'}]};
+  drafts.receive(broken);
+  assert.deepEqual(drafts.get(mcp).value,before);assert.equal(drafts.get(mcp).blocked,true);assert.equal(drafts.get(mcp).dirty,true);
+  assert.throws(()=>drafts.beginSave(mcp),/无法解析/);assert.throws(()=>drafts.reload(mcp,{confirmed:true}),/无法解析/);
+  assert.equal(drafts.get(key('models')).blocked,false);
+  const empty=new SettingsDraftStore();empty.receive(broken);
+  assert.equal(empty.get(mcp).value,undefined);assert.equal(empty.get(mcp).baseline,undefined);assert.equal(empty.get(mcp).blocked,true);
+  assert.throws(()=>empty.beginSave(mcp),/无法解析/);
+  empty.receive(snapshot('global-repaired'));assert.equal(empty.get(mcp).blocked,false);assert.equal(empty.get(mcp).value.global.command,'global-command');
+});
+
+test('项目来源中的全局错误不会封锁全局草稿，保存其他分类不覆盖坏领域旧值',()=>{
+  const drafts=store(),globalMcp=key('mcp'),projectMcp=key('mcp','project','a');
+  const projectBroken=snapshot('project-a-broken');delete projectBroken.global_mcp;
+  projectBroken.domain_errors={global_mcp:[{domain:'mcp',path:[],message:'global failure'}]};
+  drafts.receive(projectBroken,'a');assert.equal(drafts.get(globalMcp).blocked,false);assert.equal(drafts.get(projectMcp).blocked,false);
+  drafts.edit(globalMcp,value=>({...value,new:{command:'keep-this-draft'}}));
+  const ticket=drafts.beginSave(key('ui')),ack=snapshot('global-2');delete ack.global_mcp;
+  ack.domain_errors={global_mcp:[{domain:'mcp',path:[],message:'read failed'}]};
+  drafts.saved(ticket,{saved:true,revision:'global-2',snapshot:ack});
+  assert.equal(drafts.get(globalMcp).value.new.command,'keep-this-draft');assert.equal(drafts.get(globalMcp).blocked,true);
+  assert.equal(drafts.get(key('ui')).blocked,false);assert.equal(drafts.get(key('ui')).saving,false);
+});
+
+test('保存已确认而读回失败仍保留所提交值，不以缺失字段重置草稿',()=>{
+  const drafts=store(),runtime=key('runtime');drafts.edit(runtime,{tool_loop_limit:72});
+  const ticket=drafts.beginSave(runtime),ack=snapshot('global-2');delete ack.config.runtime;
+  ack.domain_errors={runtime:[{domain:'runtime',path:[],message:'read failed'}]};
+  drafts.saved(ticket,{saved:true,revision:'global-2',snapshot:ack});
+  assert.equal(drafts.get(runtime).value.tool_loop_limit,72);assert.equal(drafts.get(runtime).blocked,true);assert.equal(drafts.get(runtime).saving,false);
+});
+
+test('可读MCP字段错误呈现原值并允许修复，编辑只清实际修改的问题',()=>{
+  const broken=snapshot();broken.global_mcp.global.type='stdio';broken.global_mcp.global.tool_timeout_seconds=0;
+  broken.global_mcp.global.command='';
+  broken.domain_errors={global_mcp:[{domain:'mcp',path:['global','tool_timeout_seconds'],message:'超时必须大于0'},
+    {domain:'mcp',path:['global','command'],message:'请填写命令'}]};
+  const drafts=new SettingsDraftStore();drafts.receive(broken);const mcp=key('mcp');
+  assert.equal(drafts.get(mcp).blocked,false);assert.equal(drafts.get(mcp).value.global.tool_timeout_seconds,0);
+  assert.equal(drafts.get(mcp).issues.length,2);
+  drafts.edit(mcp,value=>({...value,global:{...value.global,tool_timeout_seconds:60}}));
+  assert.deepEqual(drafts.get(mcp).issues.map(issue=>issue.path.at(-1)),['command']);
+  drafts.edit(mcp,value=>({...value,global:{...value.global,command:'python'}}));
+  assert.deepEqual(drafts.get(mcp).issues,[]);assert.equal(drafts.get(mcp).blocked,false);
+  assert.equal(drafts.beginSave(mcp).payload.data.global.tool_timeout_seconds,60);
+});
+
+test('已有清洁草稿读取可读MCP错误会接收新原值和问题，不误判为不可读',()=>{
+  const drafts=store(),mcp=key('mcp');drafts.get(mcp);
+  const broken=snapshot('global-2');broken.global_mcp.global.tool_timeout_seconds={invalid:1};
+  broken.domain_errors={global_mcp:[{domain:'mcp',path:['global','tool_timeout_seconds'],message:'超时必须是数值'}]};
+  drafts.receive(broken);
+  assert.equal(drafts.get(mcp).blocked,false);assert.deepEqual(drafts.get(mcp).value.global.tool_timeout_seconds,{invalid:1});
+  assert.equal(drafts.get(mcp).issues[0].message,'超时必须是数值');
+  drafts.edit(mcp,value=>({...value,global:{...value.global,tool_timeout_seconds:30}}));
+  drafts.receive(broken);
+  assert.equal(drafts.get(mcp).value.global.tool_timeout_seconds,30);assert.deepEqual(drafts.get(mcp).issues,[]);
+});
+
+test('不可读MCP恢复为可读时移除旧文件错误，保留草稿与版本冲突',()=>{
+  const drafts=store(),mcp=key('mcp');drafts.edit(mcp,value=>({...value,new:{command:'local'}}));
+  const unreadable=snapshot('global-2');delete unreadable.global_mcp;
+  unreadable.domain_errors={global_mcp:[{domain:'mcp',path:[],message:'文件无法读取'}]};drafts.receive(unreadable);
+  assert.equal(drafts.get(mcp).blocked,true);
+  drafts.receive(snapshot('global-3'));
+  assert.equal(drafts.get(mcp).blocked,false);assert.equal(drafts.get(mcp).value.new.command,'local');
+  assert.equal(drafts.get(mcp).conflict,true);assert.deepEqual(drafts.get(mcp).issues,[]);
+});

@@ -413,6 +413,7 @@ class AppManager:
 
     async def bootstrap(self):
         await self.refresh_projects()
+        setup=self.configuration.setup_snapshot()
         models=[];config_error=None;ui={}
         try:
             config=self._config();ui=json_value(config.ui)
@@ -431,6 +432,7 @@ class AppManager:
         return {'name':'LanCher Code WebUI','sdk_commit':self.sdk_snapshot['commit'],
                 'projects':list(self.projects.values()),'chats':[{**chat,**self.effort_state(chat)} for chat in self.chats.values()],'models':models,
                 'ui':ui,'preferences':self.preferences,'config_error':config_error,
+                'setup':{key:setup[key] for key in ('state','config_path','issues')},
                 'watermark':self.store.watermark,'commands':command_catalog(),
                 'execution':'本机运行 · SDK 原生工具','config_path':str(self.user_home/'.lancher/lancher.yaml')}
 
@@ -761,7 +763,8 @@ class AppManager:
         if not owner.agent.resolve_permission_request(PermissionResolution(request_id,outcome)):raise WebError('审批已失效。',409)
         owner.permissions.pop(request_id,None);self.changed(chat);return {'resolved':True}
 
-    async def settings_snapshot(self,project_id=None):
+    async def settings_snapshot(self,project_id=None,domain=None):
+        if domain=='setup':return self.configuration.setup_snapshot()
         root=self.project_root(project_id) if project_id else None
         snapshot=self.configuration.snapshot(root)
         return {**snapshot,'preferences':self.preferences}
@@ -775,21 +778,26 @@ class AppManager:
             self.store.put('preferences','web',self.preferences)
             self.emit({'kind':'preferences_updated','preferences':self.preferences})
             return {'saved':True,'applied':True,'pending':[],'preferences':self.preferences}
-        root=self.project_root(payload['project_id']) if payload.get('project_id') else None
+        root=self.project_root(payload['project_id']) if payload.get('project_id') and payload.get('domain')!='setup' else None
         saved=self.configuration.save(payload,root)
         domain=payload.get('domain')
         if domain=='ui':
-            self.emit({'kind':'ui_updated','ui':json_value(self._config().ui)})
-            return {**saved,'saved':True,'applied':True,'pending':[]}
+            # 写盘后再次读取的文件可能已被别的窗口改坏；仍保留本次已保存的事实。
+            ui=saved['snapshot']['config'].get('ui')
+            if ui is not None:self.emit({'kind':'ui_updated','ui':ui})
+            return {**saved,'saved':True,'applied':ui is not None,'pending':[]}
         if domain=='execution':
             self.emit({'kind':'config_updated','domain':domain,'restart_required':True})
             return {**saved,'saved':True,'applied':False,'pending':[],'restart_required':True}
         pending=[];applied=[]
+        if domain=='setup' and saved['snapshot']['data'] is not None:
+            self.emit({'kind':'ui_updated','ui':saved['snapshot']['data']['ui']})
         for chat_id,owner in tuple(self.owners.items()):
             chat=self.chats.get(chat_id)
             if not chat:continue
             if payload.get('scope')=='project' and chat['project_id']!=payload.get('project_id'):continue
-            owner.pending_domains.add(domain)
+            if domain=='setup':owner.pending_domains.update(saved['domains'])
+            else:owner.pending_domains.add(domain)
             if self._active(chat_id):
                 owner.config_pending=True;chat['pending_config']=True
                 if not owner.agent.queue_paused:
@@ -799,8 +807,9 @@ class AppManager:
                 try:await self._apply_owner_config(chat,owner);applied.append(chat_id)
                 except Exception as exc:
                     owner.config_pending=True;chat['pending_config']=True;chat['config_apply_error']=str(exc);pending.append(chat_id);self.changed(chat)
-        self.emit({'kind':'config_updated','applied':applied,'pending':pending,'domain':payload.get('domain')})
-        return {**saved,'saved':True,'applied':applied,'pending':pending,'restart_required':payload.get('domain')=='execution'}
+        restart=domain=='execution' or domain=='setup' and bool(self.owners)
+        self.emit({'kind':'config_updated','applied':applied,'pending':pending,'domain':payload.get('domain'),'restart_required':restart})
+        return {**saved,'saved':True,'applied':applied,'pending':pending,'restart_required':restart}
 
     async def _apply_owner_config(self,chat,owner):
         agent=owner.agent;domains=owner.pending_domains or {'models','runtime','rules','mcp'}

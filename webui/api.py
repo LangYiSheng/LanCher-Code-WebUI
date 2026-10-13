@@ -105,7 +105,11 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request,exc):
         # Pydantic 默认错误包含完整 input；含凭据的设置正文不能被错误回显。
-        return JSONResponse({'detail':'请求参数格式无效，请检查必填项和选项。'},status_code=422)
+        domain='models' if '/settings/model-discovery' in request.url.path else 'request'
+        labels={'missing':'请填写该必填项。','extra_forbidden':'该字段不属于当前请求。'}
+        issues=[{'domain':domain,'path':[part for part in row.get('loc',()) if isinstance(part,(str,int)) and part not in {'body'}],
+                 'message':labels.get(row.get('type'),'该字段格式无效，请检查类型或选项。')} for row in exc.errors()]
+        return JSONResponse({'detail':'请求参数格式无效，请检查标出的字段。','issues':issues},status_code=422)
 
     @app.exception_handler(WebError)
     @app.exception_handler(Exception)
@@ -119,7 +123,9 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
             import logging
             logging.getLogger(__name__).exception('API 操作失败',exc_info=exc)
         from lancher_code.logging_system import sanitize_log_text
-        return JSONResponse({'detail':sanitize_log_text(str(exc))},status_code=status)
+        body={'detail':sanitize_log_text(str(exc))}
+        if getattr(exc,'issues',None):body['issues']=exc.issues
+        return JSONResponse(body,status_code=status)
 
     def manager(request):return request.app.state.manager
 
@@ -215,7 +221,7 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
         return result
 
     @app.get('/api/settings')
-    async def settings(request:Request,project_id:str|None=None):return await manager(request).settings_snapshot(project_id)
+    async def settings(request:Request,project_id:str|None=None,domain:str|None=None):return await manager(request).settings_snapshot(project_id,domain)
 
     @app.patch('/api/settings')
     async def save(body:dict,request:Request):return await manager(request).save_settings(body)

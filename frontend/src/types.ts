@@ -1,3 +1,4 @@
+import type {SetupStatus} from './setupState';
 export type Dict = Record<string, any>;
 export type Project = {id:string;name:string;path:string;available:boolean;pinned?:boolean};
 export type ChatSummary = {id:string;project_id:string;sdk_session_id?:string;draft?:boolean;first_turn_accepted_at?:string;title:string;status:string;phase:string;access:string;model_ref:string;reasoning_effort?:string;effort_levels?:string[];effort_known?:boolean;pinned?:boolean;archived?:boolean;updated_at?:string;pending_config?:boolean|Dict;model_notice?:string;queue_paused?:boolean;_event_sequence?:number};
@@ -8,7 +9,7 @@ export type QueueItem = {id:string;text:string;delivery:string;state:string};
 export type ChatDetail = ChatSummary & {messages:Message[];has_more?:boolean;next_before?:string;queue:QueueItem[];permissions:Permission[];plan:Dict|null;tools:Dict[];capabilities:{skills:Dict[];mcp:Dict[]};context:Dict;usage:Dict;processes:Dict[];pending_task?:Dict;compactions?:Dict;watermark:number};
 export type ModelChoice = {id:string;name:string;provider?:string;[key:string]:any};
 export type Preferences = {theme:'system'|'light'|'dark';reduce_transparency:boolean;reduce_motion:boolean;[key:string]:any};
-export type Bootstrap = {name:string;sdk_commit:string;projects:Project[];chats:ChatSummary[];models:ModelChoice[];ui:Dict;preferences:Preferences;config_error?:string;watermark:number;commands:Dict[]};
+export type Bootstrap = {name:string;sdk_commit:string;projects:Project[];chats:ChatSummary[];models:ModelChoice[];ui:Dict;preferences:Preferences;config_error?:string;setup?:SetupStatus;watermark:number;commands:Dict[]};
 export type AgentEvent = {sequence:number;project_id?:string;chat_id?:string;run_id?:string;kind:string;message?:Message;chat?:ChatSummary;project?:Project;[key:string]:any};
 export type Completion = {key:string;value:string;display:string;description:string;replace_start:number;replace_end:number;append_space?:boolean;detail?:string};
 export type FileEntry = {path:string;size?:number;status?:string;[key:string]:any};

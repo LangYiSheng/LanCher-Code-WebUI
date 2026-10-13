@@ -1,5 +1,6 @@
 import {useSyncExternalStore} from 'react';
 import type {Dict} from './types';
+import {normalizeValidationIssues,valueAtValidationPath,type ValidationIssue} from './settingsValidation.ts';
 
 export type SettingsDomain = 'web'|'ui'|'models'|'runtime'|'execution'|'mcp'|'rules';
 export type SettingsScope = 'global'|'project'|'user';
@@ -8,7 +9,7 @@ export type SettingsSnapshot = Dict & {revision?:string;preferences?:Dict};
 export type SettingsEditorDraft = {text:string;valid:boolean;source:string};
 export type SettingsDraftEntry = {
   key:SettingsDraftKey;value:any;baseline:any;dirty:boolean;saving:boolean;
-  error:string;conflict:boolean;revision:string;latestRevision:string;
+  error:string;issues:ValidationIssue[];blocked:boolean;conflict:boolean;revision:string;latestRevision:string;
   editVersion:number;lastSave:Dict|null;editors:Record<string,SettingsEditorDraft>;invalidEditors:string[];
 };
 export type SettingsSaveTicket = {
@@ -60,13 +61,16 @@ function contextId(projectId?:string):string{return projectId||'';}
 function sanitizeSnapshot(snapshot:SettingsSnapshot):SettingsSnapshot {
   const result=clone(snapshot);
   for(const provider of Object.values(result.config?.providers||{}) as Dict[]){
+    if(!object(provider))continue;
     if(Object.hasOwn(provider,'api_key'))provider.api_key='';
     for(const model of Object.values(provider.models||{}) as Dict[]){
+      if(!object(model))continue;
       if(Object.hasOwn(model,'api_key')&&model.api_key!==null)model.api_key='';
     }
   }
   for(const scope of ['global_mcp','project_mcp']){
     for(const server of Object.values(result[scope]||{}) as Dict[]){
+      if(!object(server))continue;
       for(const name of ['env','headers']){
         if(object(server[name]))server[name]=Object.fromEntries(Object.keys(server[name]).map(key=>[key,'']));
       }
@@ -76,12 +80,46 @@ function sanitizeSnapshot(snapshot:SettingsSnapshot):SettingsSnapshot {
 }
 function domainValue(snapshot:SettingsSnapshot,key:SettingsDraftKey):any {
   switch(key.domain){
-    case 'models':return {providers:clone(snapshot.config?.providers||{}),default_model:snapshot.config?.default_model||''};
-    case 'web':return clone(snapshot.preferences||{});
-    case 'ui':case 'runtime':case 'execution':return clone(snapshot.config?.[key.domain]||{});
-    case 'mcp':return clone(key.scope==='project'?snapshot.project_mcp||{}:snapshot.global_mcp||{});
-    case 'rules':return clone(key.scope==='project'?snapshot.project_rules||[]:snapshot.user_rules||[]);
+    case 'models':return snapshot.config&&Object.hasOwn(snapshot.config,'providers')&&Object.hasOwn(snapshot.config,'default_model')
+      ?{providers:clone(snapshot.config.providers),default_model:snapshot.config.default_model}:undefined;
+    case 'web':return clone(snapshot.preferences);
+    case 'ui':case 'runtime':case 'execution':return clone(snapshot.config?.[key.domain]);
+    case 'mcp':return clone(key.scope==='project'?snapshot.project_mcp:snapshot.global_mcp);
+    case 'rules':return clone(key.scope==='project'?snapshot.project_rules:snapshot.user_rules);
   }
+}
+function domainSource(key:SettingsDraftKey):string {
+  if(key.domain==='mcp')return key.scope==='project'?'project_mcp':'global_mcp';
+  if(key.domain==='rules')return key.scope==='project'?'project_rules':'user_rules';
+  return key.domain;
+}
+function sourceStatus(snapshot:SettingsSnapshot,key:SettingsDraftKey){
+  const issues=normalizeValidationIssues(snapshot.domain_errors?.[domainSource(key)]);
+  const blocked=domainValue(snapshot,key)===undefined;
+  return {issues,blocked,error:issues.map(issue=>issue.message).join(' ')||(blocked?'这项设置尚未能读取，请修复配置后重新读取。':'')};
+}
+function mergeSourceIssues(existing:ValidationIssue[],incoming:ValidationIssue[],sourceValue:any,currentValue:any):ValidationIssue[]{
+  const relevant=incoming.filter(issue=>equal(valueAtValidationPath(sourceValue,issue.path),valueAtValidationPath(currentValue,issue.path)));
+  return [...existing.filter(issue=>!relevant.some(item=>item.domain===issue.domain&&equal(item.path,issue.path))),...relevant];
+}
+function mergeSnapshot(previous:SettingsSnapshot,incoming:SettingsSnapshot,revision:string):SettingsSnapshot {
+  const result:SettingsSnapshot={...clone(previous),...clone(incoming),revision};
+  for(const source of Object.keys(incoming.domain_errors||{})){
+    if(!normalizeValidationIssues(incoming.domain_errors[source]).length)continue;
+    if(['global_mcp','project_mcp','user_rules','project_rules'].includes(source)){
+      if(!Object.hasOwn(incoming,source))delete result[source];
+    }else if(['models','ui','runtime','execution'].includes(source)&&object(result.config)){
+      for(const field of source==='models'?['providers','default_model']:[source]){
+        if(!object(incoming.config)||!Object.hasOwn(incoming.config,field))delete result.config[field];
+      }
+    }
+  }
+  return result;
+}
+function errorIssues(error:unknown):ValidationIssue[]{
+  if(!error||typeof error!=='object')return [];
+  const data='data' in error&&object(error.data)?error.data:error;
+  return normalizeValidationIssues('issues' in data?data.issues:'detail' in data&&object(data.detail)?data.detail.issues:undefined);
 }
 function payloadValue(value:any):any {
   if(Array.isArray(value))return value.map(payloadValue);
@@ -125,8 +163,8 @@ export class SettingsDraftStore {
   private source(key:SettingsDraftKey){return this.sessions.get(contextId(key.scope==='project'?key.projectId:undefined));}
   private fresh(key:SettingsDraftKey):SettingsDraftEntry|undefined {
     const source=this.source(key);if(!source)return undefined;
-    const value=domainValue(source.snapshot,key);
-    return freeze({key:clone(key),value:clone(value),baseline:clone(value),dirty:false,saving:false,error:'',
+    const value=domainValue(source.snapshot,key),status=sourceStatus(source.snapshot,key);
+    return freeze({key:clone(key),value:clone(value),baseline:clone(value),dirty:false,saving:false,...status,
       conflict:false,revision:source.revision,latestRevision:source.revision,editVersion:0,lastSave:null,editors:{},invalidEditors:[]});
   }
   private put(key:SettingsDraftKey,value:SettingsDraftEntry){
@@ -150,14 +188,19 @@ export class SettingsDraftStore {
     for(const entry of this.entries.values()){
       const key=entry.key;
       if(projectId?key.scope!=='project'||key.projectId!==projectId:key.scope==='project')continue;
-      const incoming=domainValue(source,key);
+      const incoming=domainValue(source,key),status=sourceStatus(source,key);
+      if(status.blocked){
+        // 读取失败没有新基线；保留已有值与未保存草稿，禁止把空值当成可保存配置。
+        this.put(key,{...entry,...status,latestRevision:revision});continue;
+      }
       if(entry.dirty||entry.saving){
         const changed=key.domain==='web'?!equal(entry.baseline,incoming):entry.revision!==revision;
         const conflict=entry.conflict||changed;
-        this.put(key,{...entry,latestRevision:revision,conflict,error:conflict?CONFLICT:entry.error});
+        const issues=mergeSourceIssues(entry.blocked?[]:entry.issues,status.issues,incoming,entry.value);
+        this.put(key,{...entry,blocked:false,issues,latestRevision:revision,conflict,error:conflict?CONFLICT:issues.length?status.error||entry.error:entry.blocked?'':entry.error});
       }else{
         this.put(key,{...entry,value:clone(incoming),baseline:clone(incoming),revision,latestRevision:revision,
-          dirty:false,conflict:false,error:''});
+          dirty:false,...status,conflict:false});
       }
     }
     this.publish();
@@ -166,8 +209,16 @@ export class SettingsDraftStore {
   edit(key:SettingsDraftKey,value:any|((previous:any)=>any)):void {
     const entry=this.get(key);if(!entry)throw new Error('请先读取这项设置。');
     const next=typeof value==='function'?value(clone(entry.value)):value;
+    const issues=entry.issues.filter(issue=>equal(valueAtValidationPath(entry.value,issue.path),valueAtValidationPath(next,issue.path)));
     this.put(entry.key,{...entry,value:clone(next),dirty:!equal(next,entry.baseline),editVersion:entry.editVersion+1,
-      error:entry.conflict?entry.error:''});
+      issues,error:entry.conflict||entry.blocked?entry.error:issues.length?entry.error:''});
+    this.publish();
+  }
+
+  setIssues(key:SettingsDraftKey,issues:ValidationIssue[]):void {
+    const entry=this.get(key);if(!entry)throw new Error('请先读取这项设置。');
+    const current=normalizeValidationIssues(issues).filter(issue=>issue.domain===entry.key.domain);
+    this.put(entry.key,{...entry,issues:current,error:entry.conflict||entry.blocked?entry.error:current.length?'请修正当前页面标出的设置。':''});
     this.publish();
   }
 
@@ -182,6 +233,7 @@ export class SettingsDraftStore {
   beginSave(key:SettingsDraftKey):SettingsSaveTicket {
     const entry=this.get(key);if(!entry)throw new Error('请先读取这项设置。');
     if(entry.saving)throw new Error('当前页正在保存，请等待完成。');
+    if(entry.blocked)throw new Error(entry.error||'这项设置无法读取，修复并重新读取后才可保存。');
     if(entry.invalidEditors.length)throw new Error('当前页还有未完成的 JSON，请修正后保存。');
     if(entry.conflict)throw new SettingsDraftConflictError();
     if(entry.key.domain!=='web'&&!entry.revision)throw new Error('配置版本尚未加载，请重新读取当前页。');
@@ -191,7 +243,7 @@ export class SettingsDraftStore {
     const ticket=freeze({token:++this.serial,key:clone(entry.key),payload,value:clone(entry.value),
       editVersion:entry.editVersion,revision:entry.revision,editors:clone(entry.editors)});
     this.pending.set(settingsDraftId(entry.key),ticket);
-    this.put(entry.key,{...entry,saving:true,error:''});this.publish();
+    this.put(entry.key,{...entry,saving:true,error:'',issues:[]});this.publish();
     return ticket;
   }
 
@@ -210,10 +262,11 @@ export class SettingsDraftStore {
       this.publish();return true;
     }
     let snapshot:SettingsSnapshot=clone(source?.snapshot||{});
-    if(incoming)snapshot={...snapshot,...clone(incoming),revision};
+    if(incoming)snapshot=mergeSnapshot(snapshot,incoming,revision);
     if(entry.key.domain==='web'&&object(response.preferences))snapshot.preferences=clone(response.preferences);
     snapshot=sanitizeSnapshot(snapshot);
-    const acknowledged=incoming||entry.key.domain==='web'&&object(response.preferences)
+    const acknowledgedStatus=sourceStatus(snapshot,entry.key);
+    const acknowledged=(incoming||entry.key.domain==='web'&&object(response.preferences))&&!acknowledgedStatus.blocked
       ?domainValue(snapshot,entry.key):clone(ticket.value);
     const value=rebase(ticket.value,entry.value,acknowledged);
     const editors=Object.fromEntries(Object.entries(entry.editors).filter(([name,draft])=>!equal(draft,ticket.editors[name])));
@@ -222,17 +275,20 @@ export class SettingsDraftStore {
       this.sessions.set(contextId(entry.key.projectId),freeze({...(entry.key.projectId?{projectId:entry.key.projectId}:{}),snapshot,revision}));
       for(const other of this.entries.values()){
         if(settingsDraftId(other.key)===id||contextId(other.key.projectId)!==contextId(entry.key.projectId))continue;
+        const status=sourceStatus(snapshot,other.key);
+        if(status.blocked){this.put(other.key,{...other,...status,latestRevision:revision});continue;}
         if(other.dirty||other.saving){
           const eligible=!other.conflict&&other.revision===ticket.revision;
-          this.put(other.key,{...other,latestRevision:revision,...(eligible?{revision}:{}),conflict:other.conflict});
+          const issues=mergeSourceIssues(other.blocked?[]:other.issues,status.issues,domainValue(snapshot,other.key),other.value);
+          this.put(other.key,{...other,blocked:false,issues,latestRevision:revision,...(eligible?{revision}:{}),conflict:other.conflict,error:issues.length?status.error||other.error:other.blocked?'':other.error});
         }else{
           const next=domainValue(snapshot,other.key);
-          this.put(other.key,{...other,value:clone(next),baseline:clone(next),revision,latestRevision:revision,error:'',conflict:false});
+          this.put(other.key,{...other,value:clone(next),baseline:clone(next),revision,latestRevision:revision,...status,conflict:false});
         }
       }
     }
     this.put(entry.key,{...entry,value,editors,baseline:clone(acknowledged),dirty:!equal(value,acknowledged),
-      saving:false,error:'',conflict:false,revision,latestRevision:revision,lastSave:clone(response)});
+      saving:false,error:acknowledgedStatus.error,issues:acknowledgedStatus.issues,blocked:acknowledgedStatus.blocked,conflict:false,revision,latestRevision:revision,lastSave:clone(response)});
     this.publish();return true;
   }
 
@@ -241,7 +297,12 @@ export class SettingsDraftStore {
     if(!entry||this.pending.get(id)?.token!==ticket.token)return false;
     this.pending.delete(id);
     const conflict=entry.conflict||!!error&&typeof error==='object'&&'status' in error&&error.status===409;
-    this.put(entry.key,{...entry,saving:false,error:errorText(error),conflict});this.publish();return true;
+    const returned=errorIssues(error).filter(issue=>issue.domain===entry.key.domain);
+    const issues=returned.filter(issue=>equal(valueAtValidationPath(ticket.value,issue.path),valueAtValidationPath(entry.value,issue.path)));
+    // 校验针对提交快照；保存期间已修正的字段不能再被迟到错误标红。
+    const currentVersion=entry.editVersion===ticket.editVersion;
+    const message=conflict?CONFLICT:issues.length?errorText(error):currentVersion&&!returned.length?errorText(error):'';
+    this.put(entry.key,{...entry,saving:false,error:message,issues,conflict});this.publish();return true;
   }
 
   reload(key:SettingsDraftKey,options:{confirmed?:boolean}={}):void {
@@ -249,6 +310,7 @@ export class SettingsDraftStore {
     if(entry.saving)throw new Error('当前页正在保存，请等待完成后重新读取。');
     if((entry.dirty||entry.conflict)&&!options.confirmed)throw new Error('重新读取会丢弃当前页草稿，请先确认。');
     const fresh=this.fresh(entry.key);if(!fresh)throw new Error('请先读取最新配置。');
+    if(fresh.blocked)throw new Error(fresh.error);
     this.put(entry.key,{...fresh,editVersion:entry.editVersion+1});this.publish();
   }
 }

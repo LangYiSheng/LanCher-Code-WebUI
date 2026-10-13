@@ -355,7 +355,8 @@ def test_validation_errors_never_echo_model_api_keys(client, isolated, invalid):
         payload['unexpected_secret'] = 'validation-extra-secret-must-not-echo'
     response = client.post('/api/settings/model-discovery', json=payload)
     assert response.status_code == 422
-    assert response.json() == {'detail': '请求参数格式无效，请检查必填项和选项。'}
+    assert response.json()['detail'] == '请求参数格式无效，请检查标出的字段。'
+    assert response.json()['issues'][0]['path'] == (['revision'] if invalid == 'missing_revision' else ['unexpected_secret'])
     assert 'validation-input-secret-must-not-echo' not in response.text
     assert 'validation-extra-secret-must-not-echo' not in response.text
     assert 'input' not in response.json()

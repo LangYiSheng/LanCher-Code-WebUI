@@ -1,0 +1,9 @@
+.entity-create-modal{width:min(540px,calc(100vw - 28px));max-height:calc(100dvh - 36px);overflow:auto}
+.entity-create-modal .connection-settings>.settings-field{max-width:none}
+.entity-create-modal .modal-footer{margin-top:18px}
+.entity-create-modal .advanced-settings{margin-bottom:0}
+.catalog-provider-summary{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
+.catalog-provider-summary>span,.catalog-provider-summary>small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.catalog-provider-summary>small{font-size:9px;line-height:1.65;font-weight:400;color:var(--subtle)}
+.catalog-provider-summary>small:last-child{font-family:var(--mono)}
+.mcp-service-description{font-size:11px;color:var(--muted);line-height:1.8;overflow-wrap:anywhere;margin:8px 0 15px}

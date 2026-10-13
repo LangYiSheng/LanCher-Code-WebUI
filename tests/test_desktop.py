@@ -108,6 +108,34 @@ def test_invalid_configuration_import_keeps_source_and_desktop_copy(isolated,tmp
     finally:server.stop()
 
 
+def test_configuration_import_completes_setup_without_changing_source(isolated,tmp_path,monkeypatch):
+    """导入使用专用源 home，确认桌面引导立即变为就绪。"""
+    from types import SimpleNamespace
+    from desktop.bridge import DesktopBridge
+    import json
+    resources,source_home,_=isolated
+    source=source_home/'.lancher/lancher.yaml'
+    source_bytes=source.read_bytes()
+    server=DesktopServer(resources,tmp_path/'import-ready',enable_mcp=False)
+    server.start()
+    bridge=DesktopBridge(server);bridge._window=SimpleNamespace(get_current_url=lambda:server.url)
+    monkeypatch.setattr(Path,'home',classmethod(lambda cls:source_home))
+    connection=http.client.HTTPConnection('127.0.0.1',server.port,timeout=5)
+    try:
+        connection.request('GET','/api/bootstrap',headers={'Cookie':f'{COOKIE}={server.token}'})
+        before=connection.getresponse();assert json.loads(before.read())['setup']['state']=='required'
+        assert bridge.import_config()=={'imported':True}
+        connection.request('GET','/api/bootstrap',headers={'Cookie':f'{COOKIE}={server.token}'})
+        response=connection.getresponse();body=response.read()
+        assert response.status==200
+        assert json.loads(body)['setup']['state']=='ready'
+        assert len(json.loads(body)['models'])==2
+        assert b'fixture-secret-never-exposed' not in body
+        assert source.read_bytes()==source_bytes
+        assert (server.home/'.lancher/lancher.yaml').read_bytes()==source_bytes
+    finally:connection.close();server.stop()
+
+
 def test_directory_picker_uses_host_adapter_without_python_subprocess(client,tmp_path):
     chosen=tmp_path/'chosen-project';chosen.mkdir()
     client.app.state.directory_picker=lambda:{'path':str(chosen),'cancelled':False}

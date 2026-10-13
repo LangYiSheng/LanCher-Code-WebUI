@@ -205,6 +205,34 @@
 
 证据为 [六域保存读回](data/ui-acceptance/settings-readback.json)、[原生检查器样本](data/ui-acceptance/editor-proof.json)、[差异预览](data/ui-acceptance/editor-previews.json)、[实际浏览器记录](data/ui-acceptance/browser-qa.json) 与 [最终关闭记录](data/ui-acceptance/final-shutdown.json)。最终已通过关闭接口优雅退出：实际 PID 71488 与 launcher PID 73668 均结束，8767 无监听，8765 仍返回 200。可用 [scripts/ui_acceptance_fixture.py](scripts/ui_acceptance_fixture.py) 重建专用验收服务；进程 stdin/停止由临时配置后端测试验证。
 
+## 2026-10-13 首次设置与字段校验
+
+本轮仅修改 WebUI，原 SDK 仓库保持只读，固定 wheel 的 SHA256 与 `vendor/snapshot.json` 一致。API Key 继续必填。
+
+- 后端完整回归 105 项通过；后续密钥标记、配置公开投影等修改补充定向回归，最终相关 63 项全部通过。前端 88 项测试、TypeScript 检查和生产构建通过。桌面依赖按 `desktop/requirements.txt` 的固定版本安装在 WebUI 独立环境，桌面导入正例确认引导变为 ready，源文件字节保持不变。
+- 实际浏览器完成空配置手动添加模型、发现本机列表并多选模型、明确默认模型和进入工作台；发现只请求 `127.0.0.1` 专用模型接口，没有调用外部模型。
+- 实际浏览器完成默认模型、运行参数、执行参数的多领域修复；原供应商与密钥保留。校验失败聚焦具体字段，高级区自动展开；修改 MCP 超时后清除对应错误并保存。合法 MCP 查询参数可正常保存。
+- 新增供应商、模型、MCP 弹窗均要求对应连接信息，取消不创建条目。修复了自定义下拉菜单挂在原生 dialog 外导致无法点选的问题，菜单现在位于弹窗可交互区域。Ctrl+N、Esc 无法绕过首次引导。
+- 390×844 的引导和完成后的工作台，实际 documentWidth 均为 390，没有横向溢出。损坏 YAML 仅显示原文件位置和重新读取入口，生成的原文保持不变。稳定浏览器页控制台 error 为 0。
+
+浏览器实例使用 `data/ui-setup-acceptance/` 下的专用 home、工程和数据库，可通过 `scripts/ui_setup_fixture.py --scenario new|discovery|repair|unreadable` 重建。没有写入真实用户配置。原生 Windows 窗口操作仍通过桌面回归验证，本轮没有额外进行实际原生窗口交互。
+
+实际截图：[首次设置](C:/Users/LanCher/.codex/visualizations/2026/10/13/01a13362-dec6-7c22-a10c-91e157fc0bac/webui-first-setup.jpg)、[字段错误](C:/Users/LanCher/.codex/visualizations/2026/10/13/01a13362-dec6-7c22-a10c-91e157fc0bac/webui-field-error.jpg)、[390px 引导](C:/Users/LanCher/.codex/visualizations/2026/10/13/01a13362-dec6-7c22-a10c-91e157fc0bac/webui-setup-mobile.jpg)。
+
+## 2026-10-13 激活流程与视觉重做
+
+欢迎与能力演示沿用主工作台的 LC 标志、轻雾背景、灰黑按钮、圆角、对话气泡和文件面板；功能演示使用 CSS 动画，系统及应用减少动态效果设置可关闭动画。普通引导每屏仅一个标题，保留底部主要动作与返回入口，高级参数移入按需打开的弹窗。
+
+- 前端 89 项测试通过，TypeScript 与生产构建通过；相关首次设置及桌面后端回归 54 项通过，仅既存 Starlette 弃用提示。新增配置文件存在标记，区分全新安装与已有配置缺模型；介绍已看过标记不包含连接或凭据。
+- 实际浏览器完成欢迎 → 功能演示 → 配置选择 → 供应商 → 手动模型 → 本机连接测试 → 项目选择。另一路从已有供应商缺模型直接进入配置选择，密钥留空保留，发现两个本机模型，明确选择默认模型，跳过测试后自动创建首个空白对话。
+- 桌面浏览器验收使用真实 `DesktopServer` 和 `DesktopBridge.import_config`，窗口按钮使用专用测试适配器；导入后显示 1 个供应商、2 个模型与默认 Mini，配置 SSE 事件没有抢先退出摘要页。源配置与导入副本字节相同；本轮未操作原生窗口。
+- 单模型无效默认值自动修复。运行和执行参数修复步骤在错误清除后仍可返回；无效连接显示失败与重试，并允许直接开始，不把旧缓存当作连接成功。Ctrl+N、Esc 不能绕过门禁，字段错误仍聚焦具体控件。
+- 1280×720 供应商页实际 screenHeight 与 scrollHeight 均为 447；390×844 供应商与完成页无纵向滚动、无横向溢出。模型发现和高级修复在独立弹窗或受限面板中展示。稳定桌面摘要及完成后的工作台控制台 error 均为 0。
+
+验收使用 `data/ui-setup-acceptance/activation2/` 下的专用配置，可通过 `scripts/ui_setup_fixture.py --run-id activation2` 与 `scripts/ui_setup_desktop_fixture.py` 重建。所有连接测试只请求本机模型目录，没有请求外部付费模型。用户预览服务使用独立 `preview-20261013` 分组，地址 `http://127.0.0.1:8888`，按用户要求保留运行。
+
+实际截图：[欢迎](C:/Users/LanCher/.codex/visualizations/2026/10/13/01a13362-dec6-7c22-a10c-91e157fc0bac/activation-preview.jpg)、[能力演示](C:/Users/LanCher/.codex/visualizations/2026/10/13/01a13362-dec6-7c22-a10c-91e157fc0bac/activation-story.jpg)、[供应商](C:/Users/LanCher/.codex/visualizations/2026/10/13/01a13362-dec6-7c22-a10c-91e157fc0bac/activation-provider.jpg)、[导入摘要](C:/Users/LanCher/.codex/visualizations/2026/10/13/01a13362-dec6-7c22-a10c-91e157fc0bac/activation-imported.jpg)、[390px 供应商](C:/Users/LanCher/.codex/visualizations/2026/10/13/01a13362-dec6-7c22-a10c-91e157fc0bac/activation-mobile.jpg)。
+
 ## 固定 SDK 边界
 
 当前固定 f3329bc SDK 仍没有原生取消归档接口；三个同步提交未改变 archive_session 接口，也没有新增 unarchive。网页恢复归档时恢复 Web 导航，保留 SDK archived 标记；TUI 可以按 UUID 恢复完整历史。宿主没有编造 SDK 事件。

@@ -4,7 +4,7 @@ import {Icon} from './Icon';
 import './Select.css';
 
 type Choice={value:string;label:ReactNode;text:string;disabled:boolean};
-type Props={children:ReactNode;value?:string|number|readonly string[];defaultValue?:string|number|readonly string[];onChange?:(event:{target:{value:string}})=>void;disabled?:boolean;className?:string;style?:CSSProperties;id?:string;name?:string;title?:string;required?:boolean;'aria-label'?:string;'aria-describedby'?:string};
+type Props={children:ReactNode;value?:string|number|readonly string[];defaultValue?:string|number|readonly string[];onChange?:(event:{target:{value:string}})=>void;disabled?:boolean;className?:string;style?:CSSProperties;id?:string;name?:string;title?:string;required?:boolean;'aria-label'?:string;'aria-describedby'?:string;'aria-invalid'?:boolean|'true'|'false'};
 function textOf(node:ReactNode):string{return Children.toArray(node).map(item=>typeof item==='string'||typeof item==='number'?String(item):isValidElement<{children?:ReactNode}>(item)?textOf(item.props.children):'').join('');}
 function choicesOf(children:ReactNode):Choice[]{
   return Children.toArray(children).flatMap(child=>{
@@ -14,7 +14,7 @@ function choicesOf(children:ReactNode):Choice[]{
   });
 }
 // 受控选择器：由 React 呈现选项、键盘选择和边界定位，不调用浏览器原生菜单。
-export function Select({children,value,defaultValue,onChange,disabled=false,className='',style,id,name,title,required,'aria-label':label,'aria-describedby':describedBy}:Props){
+export function Select({children,value,defaultValue,onChange,disabled=false,className='',style,id,name,title,required,'aria-label':label,'aria-describedby':describedBy,'aria-invalid':invalid}:Props){
   const choices=choicesOf(children);const [fallback,setFallback]=useState(String(defaultValue??choices[0]?.value??''));
   const current=String(value??fallback),selected=choices.findIndex(choice=>choice.value===current);
   const [open,setOpen]=useState(false),[active,setActive]=useState(0);const [position,setPosition]=useState({left:8,top:8,width:240,maxHeight:320});
@@ -52,11 +52,11 @@ export function Select({children,value,defaultValue,onChange,disabled=false,clas
   const selectedLabel=selected>=0?choices[selected].label:current||'请选择';
   return <span className={'custom-select '+className} style={style}>
     {name&&<input type="hidden" name={name} value={current} disabled={disabled}/>}
-    <button ref={trigger} id={id} type="button" className="select-trigger" role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={open?listId:undefined} aria-activedescendant={open?listId+'-'+active:undefined} aria-label={label} aria-describedby={describedBy} aria-required={required||undefined} title={title||choices[selected]?.text} disabled={disabled} onClick={()=>open?setOpen(false):show()} onKeyDown={keydown} onBlur={event=>{if(!menu.current?.contains(event.relatedTarget as Node|null))setOpen(false);}}>
+    <button ref={trigger} id={id} type="button" className="select-trigger" role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={open?listId:undefined} aria-activedescendant={open?listId+'-'+active:undefined} aria-label={label} aria-describedby={describedBy} aria-invalid={invalid} aria-required={required||undefined} title={title||choices[selected]?.text} disabled={disabled} onClick={()=>open?setOpen(false):show()} onKeyDown={keydown} onBlur={event=>{if(!menu.current?.contains(event.relatedTarget as Node|null))setOpen(false);}}>
       <span className="select-value">{selectedLabel}</span><Icon name="down" size={13}/>
     </button>
     {open&&createPortal(<div ref={menu} id={listId} role="listbox" aria-label={(label||choices[selected]?.text||'选择')+'选项'} className="select-popup" style={position}>
       {choices.map((choice,index)=><div id={listId+'-'+index} key={choice.value+'-'+index} role="option" aria-selected={choice.value===current} aria-disabled={choice.disabled||undefined} data-active={index===active} className={'select-option '+(choice.disabled?'disabled':'')} onMouseDown={event=>event.preventDefault()} onMouseEnter={()=>{if(!choice.disabled)setActive(index);}} onClick={()=>choose(index)}><span>{choice.label}</span>{choice.value===current&&<Icon name="check" size={14}/>}</div>)}
-    </div>,document.body)}
+    </div>,trigger.current?.closest('dialog')||document.body)}
   </span>;
 }

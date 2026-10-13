@@ -249,3 +249,5 @@ SDK 固定到 `f984bb72b46d8eff8d82d148782da83a62a3d308`，从原仓库已提交
 - 历史上下文估算同步 `shared_system_count`，回归确认全局 Skills 位于共享前缀、项目目录和环境位于项目部分，技能正文留在带 `host_update` 标记的宿主记录中。历史消息保持原样。
 
 测试只使用临时配置、工程及注入 Provider，不调用外部模型；缓存验证仅确认请求结构和能力边界，不代表线上命中率。
+
+Desktop 0.3.0 最终冻结 EXE 的 19 项真实窗口与 SDK 工具检查全部通过，冻结包内 164 个 SDK 文件与固定 wheel 一致。详见 `data/desktop-build/release-0.3.0-proof.json` 和 `data/desktop-build/release-0.3.0-smoke/acceptance/result.json`。正式 WebUI `.venv` 的 164 个 SDK 文件也核对一致，8765 已重启加载新快照，见 `data/sdk-update-f984bb7/production-proof.json`。浏览器已检查完成态折叠按钮以文字开头、仅保留末尾展开箭头，关于页显示 0.3.0 与完整 f984bb7 来源。

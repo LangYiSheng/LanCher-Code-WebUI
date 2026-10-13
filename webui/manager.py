@@ -28,6 +28,7 @@ from lancher_code.usage.ledger import RequestUsageRecord,summarize_records
 
 from .configuration import ConfigurationService
 from .context_preview import saved_context_usage
+from .message_presentation import completion_times, present_messages
 from lancher_code.providers.catalog import resolve_model
 from lancher_code.providers.reasoning import EFFORT_LEVELS, validate_effort
 from lancher_code.errors import ConfigError
@@ -52,6 +53,7 @@ def now():
 @dataclass
 class Owner:
     agent:object
+    message_times:dict=field(default_factory=dict)
     permissions:dict=field(default_factory=dict)
     task:asyncio.Task|None=None
     access_at:float=field(default_factory=time.monotonic)
@@ -377,15 +379,16 @@ class AppManager:
 
     def _read_snapshot(self,chat):
         owner=self.owners.get(chat['id'])
-        if owner:return json_value(owner.agent.state)
+        if owner:return present_messages(json_value(owner.agent.state),owner.message_times)
         if not chat.get('sdk_session_id'):return {'messages':[],'request_usage':{},'pending_inputs':[]}
         root=self.project_root(chat['project_id']);repo=ProjectSessionRepository(root)
         event_path=repo.paths(chat['sdk_session_id']).events
         stat=event_path.stat();key=(chat['id'],stat.st_mtime_ns,stat.st_size)
         if key in self.snapshot_cache:return self.snapshot_cache[key]
-        raw=SessionCodec.project(repo.read(chat['sdk_session_id']))
+        events=repo.read(chat['sdk_session_id'])
+        raw=SessionCodec.project(events)
         state,transcript,_,model_ref=SessionCodec.decode(raw,chat['sdk_session_id'])
-        data=json_value(state);chat.update(phase=state.work_phase,access=state.execution_access,model_ref=model_ref or chat.get('model_ref'),reasoning_effort=state.reasoning_effort)
+        data=present_messages(json_value(state),completion_times(events));chat.update(phase=state.work_phase,access=state.execution_access,model_ref=model_ref or chat.get('model_ref'),reasoning_effort=state.reasoning_effort)
         try:
             config=self._config();provider=resolve_model(config.providers,chat.get('model_ref') or config.default_model)
             data['_context_preview']=saved_context_usage(state,transcript,provider)
@@ -498,7 +501,8 @@ class AppManager:
                 if chat.get('sdk_session_id'):agent.resume_session(chat['sdk_session_id'])
                 else:agent.set_effort(chat.get('reasoning_effort','auto'))
                 chat['reasoning_effort']=agent.reasoning_effort
-                owner=Owner(agent,manual_pause=bool(chat.get('queue_paused') or agent.queue_paused));self.owners[chat_id]=owner
+                times=completion_times(ProjectSessionRepository(root).read(chat['sdk_session_id'])) if chat.get('sdk_session_id') else {}
+                owner=Owner(agent,message_times=times,manual_pause=bool(chat.get('queue_paused') or agent.queue_paused));self.owners[chat_id]=owner
                 agent.subscribe(lambda event:self._on_event(chat,owner,event))
                 agent.capabilities.add_mcp_progress_callback(lambda progress:self.emit({'kind':'capabilities_updated','progress':json_value(progress),'mcp':agent.capabilities.mcp_status()},chat=chat))
                 agent.start_capabilities()
@@ -514,6 +518,16 @@ class AppManager:
             owner.progress_at=stamp
         self._capture_baseline(chat,event)
         data=event.to_dict()
+        message=data.get('message')
+        if message and message.get('role')=='assistant' and message.get('status') in {'complete','error','cancelled'}:
+            # 实时事件与历史重放共用持久时间，归档、刷新和释放后不能发生漂移。
+            session_id=event.session_id or chat.get('sdk_session_id')
+            if message['id'] not in owner.message_times and session_id:
+                try:
+                    owner.message_times.update(completion_times(ProjectSessionRepository(self.project_root(chat['project_id'])).read(session_id)))
+                except (OSError,SessionRepositoryError):
+                    log.warning('无法读取消息完成时间，保留未知耗时',exc_info=True)
+            message['completed_at']=owner.message_times.get(message['id'])
         if event.kind=='assistant_text_delta':data['message']=None
         chat['sdk_session_id']=event.session_id or chat.get('sdk_session_id')
         request=data.get('permission_request');resolution=data.get('permission_resolution')

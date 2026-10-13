@@ -21,8 +21,8 @@ export function ModelFields({value,onChange,provider}:{value:Dict;onChange:(valu
   const inheritsKey=value.api_key_clear||!value.api_key_configured&&!value.api_key;
   return <>
     <div className="connection-settings">
-      <Field path="model_name" label="API 模型名称" note="发送给端点的实际模型 ID" required><input value={entityText(value.model_name)} onChange={event=>set('model_name',event.target.value)} placeholder="例如 deepseek-chat"/></Field>
-      <Field path="display_name" label="显示名称" note="只影响模型列表中的名称"><input value={entityText(value.display_name)} onChange={event=>set('display_name',event.target.value)} placeholder="可选"/></Field>
+      <Field path="model_name" label="API 模型名称" required><input value={entityText(value.model_name)} onChange={event=>set('model_name',event.target.value)} placeholder="例如 deepseek-chat"/></Field>
+      <Field path="display_name" label="显示名称"><input value={entityText(value.display_name)} onChange={event=>set('display_name',event.target.value)} placeholder="可选"/></Field>
     </div>
     <Advanced title="连接覆盖" note="默认继承供应商">
       <div className="connection-settings">
@@ -33,22 +33,22 @@ export function ModelFields({value,onChange,provider}:{value:Dict;onChange:(valu
         <Field path="timeout_seconds" label="请求超时（秒）"><Numeric min={1} value={value.timeout_seconds} onChange={item=>set('timeout_seconds',item)} inherited placeholder="留空继承"/><SettingSource label={value.timeout_seconds==null?'继承供应商':'模型覆盖'} value={entityText(value.timeout_seconds??provider.timeout_seconds??60,'格式无效')}/></Field>
       </div>
     </Advanced>
-    <Advanced title="容量与输出额度" note="按模型默认值使用">
+    <Advanced title="容量与输出额度">
       <div className="field-grid numeric-settings">
-        <Field path="context_window" label="上下文窗口" note={value.context_window==null?'未覆盖，采用模型默认':'独立模型覆盖'}><Numeric min={1} value={value.context_window} onChange={item=>set('context_window',item)} placeholder="模型默认"/>{value.context_window==null&&metadata?.context_window&&<SettingSource label="端点快照声明" value={entityText(metadata.context_window,'格式无效')}/>}</Field>
+        <Field path="context_window" label="上下文窗口"><Numeric min={1} value={value.context_window} onChange={item=>set('context_window',item)} placeholder="模型默认"/>{value.context_window==null&&metadata?.context_window&&<SettingSource label="端点快照声明" value={entityText(metadata.context_window,'格式无效')}/>}</Field>
         <Field path="max_output_tokens" label="总输出额度 tokens" note="思考、正文和工具参数共享上限"><Numeric min={1} value={value.max_output_tokens} onChange={item=>set('max_output_tokens',item)} placeholder="模型默认"/>{value.max_output_tokens==null&&metadata?.max_output_tokens&&<SettingSource label="端点快照上限" value={entityText(metadata.max_output_tokens,'格式无效')}/>}</Field>
-      </div><p className="small-note">留空不覆盖模型默认值。推理强度在当前对话的输入栏或 /effort 中调整。</p>
+      </div>
     </Advanced>
-    <Advanced title="端点能力快照" note="只读信息与快照修复">
+    <Advanced title="端点能力快照">
       <Field path="metadata" label="能力信息" note="无效或过期的快照可清除，连接与模型名称保持原样"><button type="button" className="secondary-button" disabled={metadata==null} onClick={()=>set('metadata',null)}>清除能力快照</button></Field>
-      {metadata?<><dl className="data-list model-capability-list"><div><dt>API ID</dt><dd>{entityText(metadata.id,'未声明')}</dd></div><div><dt>归属</dt><dd>{entityText(metadata.owned_by,'未声明')||'未声明'}</dd></div><div><dt>窗口 / 总输出上限</dt><dd>{entityText(metadata.context_window,'未声明')} / {entityText(metadata.max_output_tokens,'未声明')}</dd></div><div><dt>推理档位</dt><dd>{capabilityList(cap.effort_levels,'不提供手动档位')}</dd></div><div><dt>默认档位</dt><dd>{entityText(cap.default_effort,'未声明')||'未声明'}</dd></div><div><dt>接口形式</dt><dd>{capabilityList(cap.endpoints,'未声明可用接口')}</dd></div><div><dt>思考类型</dt><dd>{capabilityList(cap.thinking_types,'未提供')}</dd></div><div><dt>输入 / 输出模态</dt><dd>{capabilityList(metadata.input_modalities,'未提供')} / {capabilityList(metadata.output_modalities,'未提供')}</dd></div><div><dt>获取时间</dt><dd>{typeof metadata.fetched_at==='string'?new Date(metadata.fetched_at).toLocaleString('zh-CN'):'未知'}</dd></div></dl><p className="small-note">连接或 API 模型名变化后需重新发现。实际可用档位以当前对话为准。</p></>:<p className="small-note">尚未发现当前模型的能力信息。可使用“发现模型”查询端点，未知能力不会推测。</p>}
+      {metadata?<><dl className="data-list model-capability-list"><div><dt>API ID</dt><dd>{entityText(metadata.id,'未声明')}</dd></div><div><dt>归属</dt><dd>{entityText(metadata.owned_by,'未声明')||'未声明'}</dd></div><div><dt>窗口 / 总输出上限</dt><dd>{entityText(metadata.context_window,'未声明')} / {entityText(metadata.max_output_tokens,'未声明')}</dd></div><div><dt>推理档位</dt><dd>{capabilityList(cap.effort_levels,'不提供手动档位')}</dd></div><div><dt>默认档位</dt><dd>{entityText(cap.default_effort,'未声明')||'未声明'}</dd></div><div><dt>接口形式</dt><dd>{capabilityList(cap.endpoints,'未声明可用接口')}</dd></div><div><dt>思考类型</dt><dd>{capabilityList(cap.thinking_types,'未提供')}</dd></div><div><dt>输入 / 输出模态</dt><dd>{capabilityList(metadata.input_modalities,'未提供')} / {capabilityList(metadata.output_modalities,'未提供')}</dd></div><div><dt>获取时间</dt><dd>{typeof metadata.fetched_at==='string'?new Date(metadata.fetched_at).toLocaleString('zh-CN'):'未知'}</dd></div></dl><p className="small-note">连接或 API 模型名变化后需重新发现。实际可用档位以当前对话为准。</p></>:<p className="small-note">暂无能力信息，可通过“发现模型”获取。</p>}
     </Advanced>
   </>;
 }
 export function ProviderFields({value,onChange,creating=false}:{value:Dict;onChange:(value:Dict)=>void;creating?:boolean}){
   return <>
     <ProviderConnectionFields value={value} onChange={onChange} creating={creating}/>
-    <Advanced title="接口与连接参数" note="调用形式和超时">
+    <Advanced title="接口与连接参数">
       {(value.protocol==='openai'||value.api_mode!==undefined&&!API_MODES.some(([key])=>key===value.api_mode))&&<Field path="api_mode" label="OpenAI 接口形式" note="自动按端点声明选择；未声明时采用兼容聊天"><Select value={entityText(value.api_mode)||'auto'} onChange={event=>onChange({...value,api_mode:event.target.value})}>{API_MODES.map(([key,label])=><option key={key} value={key}>{label}</option>)}</Select></Field>}
       <Field path="timeout_seconds" label="请求超时（秒）" required><Numeric min={1} value={value.timeout_seconds} onChange={item=>onChange({...value,timeout_seconds:item})}/></Field>
     </Advanced>
@@ -96,7 +96,7 @@ export function SettingsModels({config,onChange,revision,notify,issues=[],focuse
       <section className="settings-model-detail" aria-label={model?'模型设置':'供应商设置'}>
         {provider?<><div className="settings-detail-heading"><div><span className="settings-detail-kind">{model?'模型':'供应商'}</span><h3>{model?modelTitle(model,modelId):providerTitle(provider,providerId)}</h3><code>{model?providerId+'/'+modelId:providerId}</code></div>{(!setupModelOnly||model)&&<button className="text-button danger-text" onClick={()=>void deleteItem()}>{model?'移除模型':'移除供应商'}</button>}</div>
           <div className="settings-model-actions">{model&&!setupModelOnly&&<button className="text-button" onClick={()=>setSelection({providerId,modelId:null})}><Icon name="globe" size={13}/>编辑供应商</button>}<button className="secondary-button" onClick={()=>setDiscovering(true)}><Icon name="search" size={14}/>发现模型</button><button className="secondary-button" onClick={addModel}><Icon name="plus" size={14}/>手动添加模型</button></div>
-          {model?<><p className="settings-item-description">继承自 {providerTitle(provider,providerId)}。只覆盖需要独立设置的项目。</p><ValidationScope path={['providers',providerId,'models',modelId!]}><ModelFields key={providerId+'/'+modelId} value={model} provider={provider} onChange={value=>updateProvider({...provider,models:{...provider.models,[modelId!]:value}})}/></ValidationScope></>:setupModelOnly?<p className="settings-item-description">{protocolName(provider.protocol)} · {entityText(provider.base_url)}<br/>选择已有模型进行修复，或发现、手动添加 API 模型。</p>:<><p className="settings-item-description">连接由下级模型默认继承，独立覆盖在各模型中设置。</p><ValidationScope path={['providers',providerId]}><ProviderFields key={providerId} value={provider} onChange={updateProvider}/></ValidationScope></>}
+          {model?<><p className="settings-item-description">继承自 {providerTitle(provider,providerId)}</p><ValidationScope path={['providers',providerId,'models',modelId!]}><ModelFields key={providerId+'/'+modelId} value={model} provider={provider} onChange={value=>updateProvider({...provider,models:{...provider.models,[modelId!]:value}})}/></ValidationScope></>:setupModelOnly?<p className="settings-item-description">{protocolName(provider.protocol)} · {entityText(provider.base_url)}<br/>选择已有模型进行修复，或发现、手动添加 API 模型。</p>:<><ValidationScope path={['providers',providerId]}><ProviderFields key={providerId} value={provider} onChange={updateProvider}/></ValidationScope></>}
         </>:<div className="panel-empty"><Icon name="globe" size={28}/><p>选择一个供应商或模型开始编辑。</p></div>}
       </section>
     </div>

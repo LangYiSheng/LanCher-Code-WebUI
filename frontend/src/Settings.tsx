@@ -20,11 +20,11 @@ const GROUPS=[
   {label:'模型与能力',items:[['models','模型与供应商','globe'],['mcp','MCP 服务','mcp'],['rules','权限规则','shield']]},
   {label:'运行与数据',items:[['runtime','Agent 行为','spark'],['execution','执行与进程','terminal'],['storage','数据与历史','history'],['about','关于','info']]},
 ];
-const DESCRIPTIONS:Record<string,string>={appearance:'设置 WebUI 外观。选择会实时预览，保存后保留。',ui:'调整显示与输入习惯，与 TUI 共用这些设置。',models:'管理连接和模型目录。新聊天采用默认模型，当前对话的模型选择保持不变。',mcp:'按配置层管理服务。项目中的同名服务覆盖全局配置。',rules:'持久规则会拒绝匹配的操作，对话中的审批仍在聊天内处理。',runtime:'设置工作阶段、访问范围与 Agent 的运行行为。',execution:'控制并发、进程和输出资源。保存后需重启服务应用。',storage:'查阅归档对话，管理浏览器输入草稿。',about:'查看前端发布版本与固定 SDK 来源。'};
+const DESCRIPTIONS:Record<string,string>={appearance:'',ui:'与 TUI 共用',models:'',mcp:'项目中的同名服务覆盖全局配置。',rules:'',runtime:'',execution:'保存后需重启服务。',storage:'',about:''};
 type Props={drafts:SettingsDraftStore;project?:Project;preferences:Preferences;onPreview:(value:Preferences)=>void;onClose:()=>void;onSaved:()=>Promise<void>;notify:(text:string)=>void;initialSection?:string;chats:ChatSummary[];projects:Project[];onOpenArchived:(id:string)=>void;onRestoreArchived:(id:string)=>Promise<void>};
 export function Settings({drafts:memory,project,preferences,onPreview,onClose,onSaved,notify,initialSection,chats,projects,onOpenArchived,onRestoreArchived}:Props){
   const store=useSettingsDrafts(memory),dialogs=useDialogs();
-  const [section,setSection]=useState(initialSection&&DESCRIPTIONS[initialSection]?initialSection:'appearance');
+  const [section,setSection]=useState(initialSection&&Object.hasOwn(DESCRIPTIONS,initialSection)?initialSection:'appearance');
   const [mcpScope,setMcpScope]=useState<'global'|'project'>('global'),[rulesScope,setRulesScope]=useState<'global'|'project'>('global');
   const [loading,setLoading]=useState(true),[loadErrors,setLoadErrors]=useState<Record<string,string>>({});
   const [focusedIssue,setFocusedIssue]=useState<ValidationIssue|null>(null);
@@ -51,7 +51,7 @@ export function Settings({drafts:memory,project,preferences,onPreview,onClose,on
   const displayedIssues=focusedIssue&&focusedIssue.domain===key.domain&&!issues.some(issue=>JSON.stringify(issue.path)===JSON.stringify(focusedIssue.path))?[...issues,focusedIssue]:issues;
   useEffect(()=>{if(focusedIssue)void focusValidationIssue(focusedIssue);},[focusedIssue,section,activeScope]);
   function locateIssue(issue:ValidationIssue){
-    if(DESCRIPTIONS[issue.domain])setSection(issue.domain);
+    if(Object.hasOwn(DESCRIPTIONS,issue.domain))setSection(issue.domain);
     setFocusedIssue({...issue});
   }
   const title=GROUPS.flatMap(group=>group.items).find(([name])=>name===section)?.[1]||'设置';
@@ -71,7 +71,7 @@ export function Settings({drafts:memory,project,preferences,onPreview,onClose,on
   }
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   useEffect(()=>{void load();return()=>{loadGeneration.current++;loadController.current?.abort();};},[project?.id]);
-  useEffect(()=>{if(initialSection&&DESCRIPTIONS[initialSection])setSection(initialSection);},[initialSection]);
+  useEffect(()=>{if(initialSection&&Object.hasOwn(DESCRIPTIONS,initialSection))setSection(initialSection);},[initialSection]);
   useEffect(()=>{if(!project){setMcpScope('global');setRulesScope('global');}},[project?.id]);
   useEffect(()=>{if(section==='appearance'||store.get(keyFor('appearance'))?.dirty)onPreview(prefs);},[section,prefs,preferences]);
   function edit(name:string,value:Dict){setFocusedIssue(null);store.edit(keyFor(name),value);}
@@ -101,19 +101,19 @@ export function Settings({drafts:memory,project,preferences,onPreview,onClose,on
   const lastSave=entry?.lastSave as Dict|undefined;
   const pending=Array.isArray(lastSave?.pending)?lastSave.pending.length>0:!!lastSave?.pending;
   const applied=Array.isArray(lastSave?.applied)?lastSave.applied.length>0:!!lastSave?.applied;
-  const savedState=lastSave?.restart_required?'已保存 · 重启服务后应用':pending?'已保存 · 运行中的聊天将在安全边界应用':lastSave?applied?'已保存 · 空闲对话已应用':'设置已保存':'当前页面没有未保存修改';
+  const savedState=lastSave?.restart_required?'已保存 · 重启服务后应用':pending?'已保存 · 运行中的聊天将在安全边界应用':lastSave?applied?'已保存 · 空闲对话已应用':'设置已保存':'';
   return <section className="settings-page settings-redesign">
     <div className="settings-body">
       <nav className="settings-nav" aria-label="设置分类"><div className="settings-nav-title">设置</div>{GROUPS.map(group=><div className="settings-nav-group" key={group.label}><h2>{group.label}</h2>{group.items.map(([name,label,icon])=><button key={name} className={'settings-nav-item '+(section===name?'active':'')} aria-current={section===name?'page':undefined} onClick={()=>setSection(name)}><Icon name={icon} size={16}/><span>{label}</span>{hasDirty(name)&&<span className="settings-draft-dot" role="img" aria-label="有未保存修改" title="有未保存修改"/>}</button>)}</div>)}</nav>
       <div className="settings-workspace">
-        <header className="settings-section-header"><div><h1>{title}</h1><p>{DESCRIPTIONS[section]}</p></div><div className="settings-section-actions">{!readOnly&&<span className={'settings-save-badge '+(conflict?'conflict':dirty?'dirty':saving?'saving':'')} role="status">{saving?'保存中':conflict?'配置已变化':dirty?'未保存':'已保存'}</span>}<button className="icon-button" aria-label="返回工作台" title="返回工作台" onClick={onClose}><Icon name="close" size={18}/></button></div></header>
+        <header className="settings-section-header"><div><h1>{title}</h1>{DESCRIPTIONS[section]&&<p>{DESCRIPTIONS[section]}</p>}</div><div className="settings-section-actions">{!readOnly&&(saving||conflict||dirty)&&<span className={'settings-save-badge '+(conflict?'conflict':dirty?'dirty':saving?'saving':'')} role="status">{saving?'保存中':conflict?'配置已变化':dirty?'未保存':'已保存'}</span>}<button className="icon-button" aria-label="返回工作台" title="返回工作台" onClick={onClose}><Icon name="close" size={18}/></button></div></header>
         {section!=='about'&&<div className="settings-scope-bar"><span><Icon name={activeScope==='project'?'folder':section==='appearance'?'monitor':'globe'} size={13}/>{scopeLabel}</span>{['mcp','rules'].includes(section)&&<Select aria-label="配置作用范围" value={activeScope} onChange={event=>section==='mcp'?setMcpScope(event.target.value as 'global'|'project'):setRulesScope(event.target.value as 'global'|'project')}><option value="global">{section==='rules'?'用户规则':'用户全局'}</option><option value="project" disabled={!project}>项目 · {project?.name||'未选择项目'}</option></Select>}</div>}
         <div className="settings-content" key={section+(section==='mcp'||section==='rules'?':'+activeScope:'')}>
           <ValidationSummary issues={issues} onSelect={locateIssue}/>
           {section!=='about'&&(loadError||entry?.error)&&<div className="settings-error inline-error" role="alert"><span>{loadError||String(entry?.error)}</span><button className="text-button" disabled={saving} onClick={()=>void reloadCurrent()}>重新读取当前页</button></div>}
           {section!=='about'&&conflict&&!entry?.error&&<div className="settings-error inline-error" role="alert"><span>配置在其他界面发生变化。当前草稿已保留，请重新读取当前页后再保存。</span><button className="text-button" onClick={()=>void reloadCurrent()}>重新读取当前页</button></div>}
           {section==='about'?<SettingsAbout/>:loading?<div className="panel-empty"><Spinner/>正在读取配置…</div>:(!entry||entry.blocked)&&section!=='storage'?<div className="panel-empty">这页配置无法安全读取。请修复配置文件，再重新读取。{sourcePath&&<code className="settings-config-path">{sourcePath}</code>}<button className="text-button" onClick={()=>void reloadCurrent()}>重新读取</button></div>:<ValidationProvider domain={key.domain} issues={displayedIssues}>
-            {section==='appearance'&&<><div className="settings-subheading"><div><h3>主题</h3><p>选择浅色、深色或跟随系统。</p></div></div><div className="theme-options">{[['light','浅色','sun'],['dark','深色','moon'],['system','跟随系统','monitor']].map(([name,label,icon])=><button className={prefs.theme===name?'selected':''} key={name} onClick={()=>store.edit(keyFor('appearance'),{...prefs,theme:name})}><span className={'theme-preview '+name}><i/><i/><i/></span><span><Icon name={icon} size={16}/>{label}{prefs.theme===name&&<Icon name="check" size={15}/>}</span></button>)}</div><Field label="减少透明效果" note="减少半透明遮罩与背景效果"><input type="checkbox" checked={!!prefs.reduce_transparency} onChange={event=>store.edit(keyFor('appearance'),{...prefs,reduce_transparency:event.target.checked})}/></Field><Field label="减少动画" note="关闭过渡与动画，也遵循操作系统偏好"><input type="checkbox" checked={prefs.reduce_motion} onChange={event=>store.edit(keyFor('appearance'),{...prefs,reduce_motion:event.target.checked})}/></Field></>}
+            {section==='appearance'&&<><div className="settings-subheading"><div><h3>主题</h3></div></div><div className="theme-options">{[['light','浅色','sun'],['dark','深色','moon'],['system','跟随系统','monitor']].map(([name,label,icon])=><button className={prefs.theme===name?'selected':''} key={name} onClick={()=>store.edit(keyFor('appearance'),{...prefs,theme:name})}><span className={'theme-preview '+name}><i/><i/><i/></span><span><Icon name={icon} size={16}/>{label}{prefs.theme===name&&<Icon name="check" size={15}/>}</span></button>)}</div><Field label="减少透明效果"><input type="checkbox" checked={!!prefs.reduce_transparency} onChange={event=>store.edit(keyFor('appearance'),{...prefs,reduce_transparency:event.target.checked})}/></Field><Field label="减少动画"><input type="checkbox" checked={prefs.reduce_motion} onChange={event=>store.edit(keyFor('appearance'),{...prefs,reduce_motion:event.target.checked})}/></Field></>}
             {section==='ui'&&<UiFields value={ui} onChange={value=>edit('ui',value)}/>}
             {section==='models'&&<SettingsModels config={models} onChange={value=>{setFocusedIssue(null);edit('models',value);}} revision={entry?.revision||''} notify={notify} issues={displayedIssues} focusedIssue={focusedIssue} onValidationIssue={issue=>{store.setIssues(key,[...issues,issue]);locateIssue(issue);}}/>}
             {section==='runtime'&&<RuntimeFields value={runtime} onChange={value=>edit('runtime',value)}/>}
@@ -123,7 +123,7 @@ export function Settings({drafts:memory,project,preferences,onPreview,onClose,on
             {section==='storage'&&<SettingsStorage chats={chats} projects={projects} onOpenArchived={onOpenArchived} onRestoreArchived={onRestoreArchived} notify={notify}/>}
           </ValidationProvider>}
         </div>
-        {section!=='about'&&<footer className="settings-footer"><div><span>{scopeLabel}</span>{!readOnly&&<small>{conflict?'草稿已保留，重新读取当前页后可保存':dirty?'未保存修改，仅提交当前页面与配置层':savedState}</small>}</div>{!readOnly&&<div className="settings-save-actions">{dirty&&<button className="text-button" disabled={saving||loading} onClick={()=>void reloadCurrent()}>放弃当前页修改</button>}<button className="primary-button" disabled={!dirty||saving||loading||conflict||!!entry?.blocked||!!entry?.invalidEditors.length} onClick={()=>void save()}>{saving?<Spinner/>:<Icon name="check" size={15}/>}保存修改</button></div>}</footer>}
+        {section!=='about'&&<footer className="settings-footer"><div>{!readOnly&&!dirty&&!conflict&&<small role="status">{savedState}</small>}</div>{!readOnly&&<div className="settings-save-actions">{dirty&&<button className="text-button" disabled={saving||loading} onClick={()=>void reloadCurrent()}>放弃当前页修改</button>}<button className="primary-button" disabled={!dirty||saving||loading||conflict||!!entry?.blocked||!!entry?.invalidEditors.length} onClick={()=>void save()}>{saving?<Spinner/>:<Icon name="check" size={15}/>}保存修改</button></div>}</footer>}
       </div>
     </div>
   </section>;

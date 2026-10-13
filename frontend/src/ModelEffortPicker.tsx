@@ -56,8 +56,8 @@ export function ModelEffortPicker({summary,models,disabled,action,notify}:{summa
           onKeyUp={event=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key))void commit('effort',levels[Number(event.currentTarget.value)]);}}
           onBlur={event=>{if(preview!==null)void commit('effort',levels[Number(event.currentTarget.value)]);}}/>
           <div className="effort-stops">{levels.map(level=><button key={level} disabled={pending} aria-label={'思考等级：'+(EFFORT_LABELS[level]||level)} aria-pressed={level===effort} onClick={()=>void commit('effort',level)}>{EFFORT_LABELS[level]||level}</button>)}</div></>
-          :<p className="effort-note">{summary?.effort_known?'此模型使用自动思考，不支持手动调整。':'正在等待模型的可用等级。'}</p>}
-        {levels.length>1&&<p className="effort-note">{summary?.effort_known?'更高等级适合复杂任务，通常需要更多时间。':'自动沿用模型默认；手动等级由服务端校验。'}</p>}
+          :<p className="effort-note">{summary?.effort_known?'仅支持自动':'等级待确认'}</p>}
+
       </div>
     </div>,document.body)}
   </>;

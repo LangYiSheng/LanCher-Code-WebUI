@@ -1,5 +1,17 @@
 /* 工作台交互：保持信息紧凑，动画只用于表达位置和层级。 */
 :root{--workbench-ease:cubic-bezier(.22,.8,.25,1)}
+.thinking-process{margin-bottom:14px}
+.thinking-toggle{display:flex;align-items:center;gap:8px;padding:5px 0;color:var(--subtle);font-size:12px;line-height:20px;text-align:left}
+.thinking-toggle:hover{color:var(--text)}
+.thinking-toggle>.expanded{transform:rotate(90deg)}
+.thinking-toggle>svg:last-child{transition:transform .18s var(--workbench-ease)}
+.thinking-toggle .spinner{height:13px;width:13px}
+.thinking-content{margin:10px 0 4px 6px;padding:1px 0 1px 17px;border-left:1px solid var(--border);color:var(--muted);font-size:12px;animation:panel-content-in .2s ease}
+.thinking-content>.markdown{margin:12px 0}
+.thinking-fragment{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.8;margin:12px 0}
+.thinking-content:empty{display:none}
+.message-error{color:var(--red);margin-bottom:12px}
+.copy-message:focus-visible{opacity:1}
 @keyframes panel-content-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 @media(min-width:801px){
   .sidebar{transition:width .24s var(--workbench-ease),padding .24s var(--workbench-ease);overflow:clip}

@@ -7,9 +7,9 @@ export function UiFields({value,onChange}:{value:Dict;onChange:(value:Dict)=>voi
   const set=(name:string,item:unknown)=>onChange({...value,[name]:item});
   return <>
     <Field label="显示时间戳" path="show_timestamps"><input type="checkbox" checked={!!value.show_timestamps} onChange={event=>set('show_timestamps',event.target.checked)}/></Field>
-    <Field label="显示思考状态" path="show_thinking_status" note="只改变轨迹显示，推理强度由对话选择"><input type="checkbox" checked={value.show_thinking_status!==false} onChange={event=>set('show_thinking_status',event.target.checked)}/></Field>
+    <Field label="显示思考状态" path="show_thinking_status" note="不影响模型推理"><input type="checkbox" checked={value.show_thinking_status!==false} onChange={event=>set('show_thinking_status',event.target.checked)}/></Field>
     <Field label="忙时默认输入操作" path="busy_enter_action"><Select value={value.busy_enter_action||'follow_up'} onChange={event=>set('busy_enter_action',event.target.value)}><option value="follow_up">加入后续任务</option><option value="steer">立即补充指令</option><option value="draft">保留草稿</option></Select></Field>
-    <Advanced title="TUI 外观" note="终端界面独立主题"><Field label="TUI 主题" path="theme" note="WebUI 主题在“外观”中设置"><Select value={value.theme||'dark'} onChange={event=>set('theme',event.target.value)}><option value="light">浅色</option><option value="dark">深色</option></Select></Field></Advanced>
+    <Advanced title="TUI 外观"><Field label="TUI 主题" path="theme"><Select value={value.theme||'dark'} onChange={event=>set('theme',event.target.value)}><option value="light">浅色</option><option value="dark">深色</option></Select></Field></Advanced>
   </>;
 }
 
@@ -30,6 +30,6 @@ export function ExecutionFields({value,onChange,editor,onEditor}:{value:Dict;onC
   return <>
     <div className="field-grid numeric-settings">{Object.entries(LIMIT_LABELS).filter(([name])=>['max_concurrency','max_processes'].includes(name)).map(([name,label])=><Field key={name} label={label} path={['limits',name]}><Numeric min={1} value={value.limits?.[name]} onChange={item=>limit(name,item)}/></Field>)}</div>
     <Advanced title="会话资源、输出与超时"><div className="field-grid numeric-settings">{Object.entries(LIMIT_LABELS).filter(([name])=>!['max_concurrency','max_processes'].includes(name)).map(([name,label])=><Field key={name} label={label} path={['limits',name]}><Numeric min={0} value={value.limits?.[name]} onChange={item=>limit(name,item)}/></Field>)}</div></Advanced>
-    <Advanced title="命令资源约定" note="完整结构编辑"><JsonEditor label="命令资源配置" path="command_profiles" value={value.command_profiles||[]} onChange={command_profiles=>onChange({...value,command_profiles})} draft={editor} onDraft={onEditor} note="命令资源与就绪条件，修改时保留完整结构。"/></Advanced>
+    <Advanced title="命令资源约定"><JsonEditor label="命令资源配置" path="command_profiles" value={value.command_profiles||[]} onChange={command_profiles=>onChange({...value,command_profiles})} draft={editor} onDraft={onEditor}/></Advanced>
   </>;
 }

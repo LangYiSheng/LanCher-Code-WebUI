@@ -1,4 +1,5 @@
 import type {AgentEvent,Bootstrap,ChatDetail,ChatSummary,Message,WorkbenchState} from './types.ts';
+import {appendMessageText} from './messagePresentation.ts';
 export const initialState:WorkbenchState={boot:null,projects:[],chats:[],details:{},sequence:0};
 function upsert<T extends {id:string}>(items:T[],item:T):T[]{const found=items.find(x=>x.id===item.id);return found?items.map(x=>x.id===item.id?{...x,...item}:x):[item,...items];}
 export function mergeMessages(older:Message[],newer:Message[]):Message[]{const result=new Map<string,Message>();for(const message of [...older,...newer])if(message.role!=='system')result.set(message.id,message);return [...result.values()];}
@@ -25,7 +26,7 @@ export function applyEvent(state:WorkbenchState,event:AgentEvent):WorkbenchState
   if(!id||!state.details[id])return next;
   let detail={...(next.details[id]||state.details[id]),watermark:event.sequence};
   if(event.message)detail.messages=mergeMessages(detail.messages,[event.message]);
-  else if(event.kind==='assistant_text_delta'&&event.text){const last=[...detail.messages].reverse().find(x=>x.role==='assistant');if(last)detail.messages=detail.messages.map(x=>x.id===last.id?{...x,content:x.content+event.text}:x);}
+  else if(event.kind==='assistant_text_delta'&&event.text){const last=[...detail.messages].reverse().find(x=>x.role==='assistant');if(last?.status==='streaming')detail.messages=detail.messages.map(x=>x.id===last.id?appendMessageText(x,event.text):x);}
   if(event.kind==='permission_request_created'&&event.permission_request)detail.permissions=[...detail.permissions.filter(x=>x.request_id!==event.permission_request.request_id),event.permission_request];
   if(['permission_request_resolved','permission_request_closed'].includes(event.kind)){const req=event.permission_resolution?.request_id||event.permission_request?.request_id;detail.permissions=detail.permissions.filter(x=>x.request_id!==req);}
   if(event.kind==='pending_input_changed'&&event.queue)detail.queue=event.queue;

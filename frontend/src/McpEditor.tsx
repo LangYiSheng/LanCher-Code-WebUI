@@ -20,7 +20,7 @@ function McpConnectionFields({value,onChange,creating=false}:{value:Dict;onChang
   return <div className="connection-settings">
     <Field path="type" label="传输类型" note="本地进程使用 stdio，远程服务使用 HTTP" required><Select value={entityText(value.type)} onChange={event=>set('type',event.target.value)}><option value="" disabled>请选择传输类型</option><option value="stdio">标准输入输出（stdio）</option><option value="http">HTTP</option></Select></Field>
     {!creating&&<Field path="enabled" label="启用"><input type="checkbox" checked={value.enabled!==false} onChange={event=>set('enabled',event.target.checked)}/></Field>}
-    {value.type==='http'?<Field path="url" label="服务 URL" note="填写 MCP HTTP 端点的完整地址" required><input value={entityText(value.url)} onChange={event=>set('url',event.target.value)} placeholder="例如 https://mcp.example.com/mcp" inputMode="url" spellCheck={false}/></Field>:value.type==='stdio'?<>
+    {value.type==='http'?<Field path="url" label="服务 URL" required><input value={entityText(value.url)} onChange={event=>set('url',event.target.value)} placeholder="例如 https://mcp.example.com/mcp" inputMode="url" spellCheck={false}/></Field>:value.type==='stdio'?<>
       <Field path="command" label="启动命令" note="只填可执行程序，命令参数在下方单独填写" required><input value={entityText(value.command)} onChange={event=>set('command',event.target.value)} placeholder="例如 npx、uvx 或 python" spellCheck={false}/></Field>
       <Field path="args" label="命令参数" note="每行一个参数"><textarea value={(Array.isArray(value.args)?value.args:[]).map((item:unknown)=>entityText(item)).join('\n')} onChange={event=>set('args',event.target.value.split('\n').filter(Boolean))} placeholder={'例如 -y\n@modelcontextprotocol/server-example'}/></Field>
     </>:null}
@@ -28,7 +28,7 @@ function McpConnectionFields({value,onChange,creating=false}:{value:Dict;onChang
 }
 function McpAdvancedFields({value,onChange}:{value:Dict;onChange:(value:Dict)=>void}){
   return <Advanced title="MCP 高级设置" note={value.type==='http'?'请求头与超时':'环境变量与超时'}>
-    <div className="field-grid numeric-settings"><Field path="startup_timeout_seconds" label="启动超时（秒）" note="留空使用默认值"><Numeric min={1} value={value.startup_timeout_seconds} onChange={item=>onChange({...value,startup_timeout_seconds:item})}/></Field><Field path="tool_timeout_seconds" label="工具超时（秒）" note="留空使用默认值"><Numeric min={1} value={value.tool_timeout_seconds} onChange={item=>onChange({...value,tool_timeout_seconds:item})}/></Field><Field path="close_timeout_seconds" label="关闭超时（秒）" note="留空使用默认值"><Numeric min={1} value={value.close_timeout_seconds} onChange={item=>onChange({...value,close_timeout_seconds:item})}/></Field></div>
+    <div className="field-grid numeric-settings"><Field path="startup_timeout_seconds" label="启动超时（秒）"><Numeric min={1} placeholder="默认值" value={value.startup_timeout_seconds} onChange={item=>onChange({...value,startup_timeout_seconds:item})}/></Field><Field path="tool_timeout_seconds" label="工具超时（秒）"><Numeric min={1} placeholder="默认值" value={value.tool_timeout_seconds} onChange={item=>onChange({...value,tool_timeout_seconds:item})}/></Field><Field path="close_timeout_seconds" label="关闭超时（秒）"><Numeric min={1} placeholder="默认值" value={value.close_timeout_seconds} onChange={item=>onChange({...value,close_timeout_seconds:item})}/></Field></div>
     {value.type==='http'?<SecretMap path="headers" label="请求头" value={value.headers||{}} onChange={(headers,headers_remove)=>onChange({...value,headers,headers_remove,headers_clear:(value.headers_clear||[]).filter((name:string)=>!headers[name])})} removed={value.headers_remove||[]}/>:value.type==='stdio'?<SecretMap path="env" label="环境变量" value={value.env||{}} onChange={(env,env_remove)=>onChange({...value,env,env_remove,env_clear:(value.env_clear||[]).filter((name:string)=>!env[name])})} removed={value.env_remove||[]}/>:null}
   </Advanced>;
 }
@@ -45,7 +45,7 @@ export function McpCreateDialog({existing,onClose,onCreate}:{existing:Dict;onClo
     const common={type:value.type,enabled:true,startup_timeout_seconds:value.startup_timeout_seconds,tool_timeout_seconds:value.tool_timeout_seconds,close_timeout_seconds:value.close_timeout_seconds};
     onCreate(id,value.type==='http'?{...common,url:value.url.trim(),headers:value.headers}:{...common,command:value.command.trim(),args:value.args,env:value.env});
   }
-  return <Modal title="新增 MCP 服务" subtitle="填写与传输类型对应的连接信息，添加后保存设置生效。" onClose={onClose} className="entity-create-modal settings-redesign">
+  return <Modal title="新增 MCP 服务" onClose={onClose} className="entity-create-modal settings-redesign">
     <form ref={form} noValidate onSubmit={event=>{event.preventDefault();submit();}}><ValidationProvider domain="mcp" issues={issues}>
       <div className="connection-settings"><Field path="name" label="服务名称" note="使用字母、数字、短横线或下划线，例如 filesystem" required><input autoFocus value={name} maxLength={100} onChange={event=>{setName(event.target.value);setIssues(items=>items.filter(item=>item.path[0]!=='name'));}} placeholder="例如 filesystem"/></Field></div>
       <McpConnectionFields creating value={value} onChange={edit}/>
@@ -62,7 +62,7 @@ export function McpEditor({value,onChange,issues=[],focusedIssue}:{value:Dict;on
   return <>
     <div className="editor-heading"><h3>MCP 服务</h3><button className="secondary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={14}/>新增服务</button></div>
     <div className="model-selector"><Select aria-label="选择 MCP 服务" value={selected} onChange={event=>setSelected(event.target.value)}><option value="">选择服务…</option>{Object.keys(value||{}).map(name=><option key={name}>{name}</option>)}</Select>{server&&<button className="danger-text" onClick={async()=>{if(!await confirm({title:'删除 MCP 服务',message:'将从待保存配置中移除 '+selected+'。保存设置后生效。',confirmLabel:'移除服务',danger:true}))return;const next={...value};delete next[selected];onChange(next);}}>删除服务</button>}</div>
-    {server?<ValidationScope path={[selected]}><p className="mcp-service-description">{server.type==='http'?'HTTP · '+(entityText(server.url)||'尚未填写服务 URL'):'stdio · '+(entityText(server.command)||'尚未填写启动命令')}</p><McpConnectionFields value={server} onChange={update}/><McpAdvancedFields value={server} onChange={update}/></ValidationScope>:<div className="panel-empty">添加服务时，请填写传输类型和对应的启动命令或 HTTP 地址。</div>}
+    {server?<ValidationScope path={[selected]}><p className="mcp-service-description">{server.type==='http'?'HTTP · '+(entityText(server.url)||'尚未填写服务 URL'):'stdio · '+(entityText(server.command)||'尚未填写启动命令')}</p><McpConnectionFields value={server} onChange={update}/><McpAdvancedFields value={server} onChange={update}/></ValidationScope>:<div className="panel-empty">暂无 MCP 服务</div>}
     {creating&&<McpCreateDialog existing={value||{}} onClose={()=>setCreating(false)} onCreate={(name,server)=>{onChange({...value,[name]:server});setSelected(name);setCreating(false);}}/>}
   </>;
 }

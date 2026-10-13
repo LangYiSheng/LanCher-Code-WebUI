@@ -49,9 +49,9 @@ export function ProcessesPanel({chat,action,notify,enabled=true}:{chat:ChatDetai
   function row(item:Dict){const status=processState(item);return <button key={item.process_id} className={'process-row '+(item.process_id===selected?'selected':'')} aria-pressed={item.process_id===selected} onClick={()=>{setChosen(item.process_id);setFollow(false);}}>
     <span className={'process-indicator '+status.tone}/><span className="process-row-main"><strong>{item.description||item.command||item.process_id}</strong><small>PID {item.pid??'—'} · {item.lifetime==='session'?'会话保留':'本轮任务'}{item.exit_code!=null?' · 退出码 '+item.exit_code:''}</small></span><span className={'process-status '+status.tone}>{status.label}</span>
   </button>;}
-  return <div className="process-panel"><header className="panel-heading"><div><h2>托管进程</h2><p>当前对话的命令与后台服务</p></div><span className={'panel-count '+(groups.active.length?'success':'')}>{groups.active.length} 个活动</span></header>
-    <section className="process-list" aria-label="活动进程"><div className="process-group-label">活动进程 <span>{groups.active.length}</span></div>
-      {groups.active.length?groups.active.map(row):<div className="compact-empty"><Icon name="check" size={16}/><span>当前没有运行中的进程</span></div>}
+  return <div className="process-panel"><header className="panel-heading"><div><h2>托管进程</h2></div><span className={'panel-count '+(groups.active.length?'success':'')}>{groups.active.length} 个活动</span></header>
+    <section className="process-list" aria-label="活动进程">
+      {groups.active.length?groups.active.map(row):<div className="compact-empty"><Icon name="check" size={16}/><span>暂无运行中的进程</span></div>}
     </section>
     {groups.finished.length>0&&<section className="process-history"><button className="process-history-toggle" aria-expanded={history||!groups.active.length} onClick={()=>setHistory(value=>!value)} disabled={!groups.active.length}><Icon name="chevron" size={12} style={{transform:history||!groups.active.length?'rotate(90deg)':undefined}}/>已结束 <span>{groups.finished.length}</span></button>{(history||!groups.active.length)&&<div className="process-history-list">{groups.finished.map(row)}</div>}</section>}
     {process?<section className="process-detail" aria-label="进程详情"><div className="section-heading"><h3>{process.description||'进程详情'}</h3><span className={'process-status '+state.tone}>{state.label}</span></div>
@@ -63,7 +63,7 @@ export function ProcessesPanel({chat,action,notify,enabled=true}:{chat:ChatDetai
       {error&&<p className="inline-error" role="alert">{error}</p>}
       <pre ref={output} tabIndex={0} aria-label="进程输出日志" className="process-output" onScroll={event=>{const el=event.currentTarget;shouldFollow.current=el.scrollHeight-el.scrollTop-el.clientHeight<30;}}>{page.output||(reading===selected?'正在读取日志…':page.loaded?'暂无输出':'尚未读取日志')}</pre>
       {page.trimmed&&<p className="small-note">仅展示最近 200,000 个字符。</p>}{page.more&&<button className="text-button" disabled={reading===selected} onClick={()=>void read(selected)}>继续读取后续输出<Icon name="down" size={12}/></button>}
-      {state.canWrite&&<form className="process-input" onSubmit={event=>{event.preventDefault();if(page.input&&!pending)void perform('process_write');}}><input aria-label="进程输入" placeholder="向进程发送输入，Enter 提交…" value={page.input} onChange={event=>updatePage(selected,current=>({...current,input:event.target.value}))}/><button className="secondary-button" disabled={!page.input||!!pending}>发送</button></form>}
-    </section>:<p className="small-note process-intro">Agent 执行命令后，你可以在这里查看状态与日志。</p>}
+      {state.canWrite&&<form className="process-input" onSubmit={event=>{event.preventDefault();if(page.input&&!pending)void perform('process_write');}}><input aria-label="进程输入" placeholder="输入内容…" value={page.input} onChange={event=>updatePage(selected,current=>({...current,input:event.target.value}))}/><button className="secondary-button" disabled={!page.input||!!pending}>发送</button></form>}
+    </section>:null}
   </div>;
 }

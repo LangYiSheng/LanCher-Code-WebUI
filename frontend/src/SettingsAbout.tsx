@@ -8,7 +8,7 @@ export function SettingsAbout(){
   return <section className="settings-about" aria-label="发布版本与 SDK 来源">
     <div className="settings-about-brand"><Brand size={40}/><div><h2>LanCher Code {isDesktop()?'Desktop':'WebUI'}</h2><p>本机 AI 编程工作台</p></div></div>
     <dl className="settings-about-versions">
-      <div><dt>WebUI 版本</dt><dd><strong>{release.webuiVersion}</strong></dd></div>
+      <div><dt>{isDesktop()?'Desktop 版本':'WebUI 版本'}</dt><dd><strong>{release.webuiVersion}</strong></dd></div>
       <div><dt>LanCher Code SDK</dt><dd><strong>{release.sdkVersion}</strong></dd></div>
       <div><dt>SDK 提交</dt><dd><code>{release.sdkCommit}</code></dd></div>
     </dl>

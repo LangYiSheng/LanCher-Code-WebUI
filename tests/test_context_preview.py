@@ -31,7 +31,16 @@ def native_context_turn(client, isolated, provider):
     return identity, state
 
 
-def test_released_native_session_context_matches_live_estimate(client, isolated, provider):
+def test_released_native_session_context_matches_live_estimate(client, isolated, provider, monkeypatch):
+    import webui.context_preview as preview
+    requests = []
+    estimate = preview.estimate_request
+
+    def capture(request, state):
+        requests.append((request, state))
+        return estimate(request, state)
+
+    monkeypatch.setattr(preview, 'estimate_request', capture)
     expected_window = configured_context_window(isolated)
     identity, live = native_context_turn(client, isolated, provider)
     assert live['context']['window'] == expected_window and live['context']['tokens'] > 0
@@ -43,6 +52,8 @@ def test_released_native_session_context_matches_live_estimate(client, isolated,
     # 只允许 SDK 请求前缀的轻微增量；不能用整个会话累计输入替代当前上下文。
     assert abs(saved['context']['tokens'] - live['context']['tokens']) <= max(256, live['context']['tokens'] * 0.20)
     assert saved['usage'] == live['usage']
+    outgoing, context = requests[-1]
+    assert outgoing.shared_system_count == context.prefix_state['shared_system_count'] > 0
     repeated = detail(client, identity)
     assert repeated['context'] == saved['context'] and repeated['usage'] == saved['usage']
 

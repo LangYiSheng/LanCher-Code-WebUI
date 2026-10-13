@@ -84,7 +84,7 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
         try:yield
         finally:await manager.close()
 
-    app=FastAPI(title='LanCher Code WebUI',version='0.2.0',lifespan=lifespan,docs_url=None,redoc_url=None)
+    app=FastAPI(title='LanCher Code WebUI',version='0.3.0',lifespan=lifespan,docs_url=None,redoc_url=None)
 
     @app.middleware('http')
     async def security(request,call_next):

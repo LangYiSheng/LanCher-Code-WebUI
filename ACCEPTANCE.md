@@ -238,3 +238,14 @@
 当前固定 f3329bc SDK 仍没有原生取消归档接口；三个同步提交未改变 archive_session 接口，也没有新增 unarchive。网页恢复归档时恢复 Web 导航，保留 SDK archived 标记；TUI 可以按 UUID 恢复完整历史。宿主没有编造 SDK 事件。
 
 原生命令运行在本机，权限属于 SDK 应用层检查，Docker 不是运行依赖。原开发仓库代码、环境与 Git 状态保持独立。旧 `D:\Dev\LanCher Agent Lab` 与本项目 `data/legacy/data/` 仅保留磁盘备份。本轮已从当前产品移除旧实验历史入口及后端读取链，历史阶段的验收证据仍保留原来源，不改写为当前产品能力。
+
+## 0.3.0 与 SDK f984bb7 同步（2026-10-13）
+
+SDK 固定到 `f984bb72b46d8eff8d82d148782da83a62a3d308`，从原仓库已提交的 Git 归档构建 wheel；原仓库和 TUI 环境保持只读。源码、wheel 和验收环境的 164 个 SDK 文件逐一一致，证据为 `data/sdk-update-f984bb7/build-proof.json`。SDK 版本仍为 0.1.0，WebUI 与 Desktop 共用应用版本 0.3.0。
+
+- SDK 提示词、Skills、模型发现和缓存回归：128 passed、2 skipped。见 `data/sdk-update-f984bb7/sdk-tests.log`。
+- 后端完整回归首次为 120 passed、1 failed，唯一失败是专用环境尚未安装 pywebview；补齐锁定桌面依赖后，桌面 10 项全部通过。因此当前 121 项后端测试均有通过证据，并非单次完整 121 项通过。见同目录 `webui-tests.log` 与 `desktop-tests.log`。
+- 前端 105 项测试、TypeScript 检查与生产构建通过。见同目录 `frontend-tests.log`。
+- 历史上下文估算同步 `shared_system_count`，回归确认全局 Skills 位于共享前缀、项目目录和环境位于项目部分，技能正文留在带 `host_update` 标记的宿主记录中。历史消息保持原样。
+
+测试只使用临时配置、工程及注入 Provider，不调用外部模型；缓存验证仅确认请求结构和能力边界，不代表线上命中率。

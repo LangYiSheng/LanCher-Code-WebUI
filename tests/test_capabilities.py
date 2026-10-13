@@ -221,6 +221,16 @@ def test_user_project_skills_control_real_load_and_request_projection(client, is
     blocks = _request_text(captured[-1])
     assert '<active_skill id="project/review">' in blocks and '项目来源验收指南' in blocks
     assert '<active_skill id="user/review">' in blocks and '用户来源验收指南' in blocks
+    outgoing = captured[-1]
+    shared = '\n'.join(outgoing.system[:outgoing.shared_system_count])
+    project_prefix = '\n'.join(outgoing.system[outgoing.shared_system_count:])
+    assert '<skills_catalog scope="user">' in shared
+    assert '<skills_catalog scope="project">' not in shared and str(workspace) not in shared
+    assert '<skills_catalog scope="project">' in project_prefix and str(workspace) in project_prefix
+    assert '用户来源验收指南' not in '\n'.join(outgoing.system)
+    assert '项目来源验收指南' not in '\n'.join(outgoing.system)
+    updates = [item for item in outgoing.messages if item.control_kind == 'host_update']
+    assert updates and any('<skills_state>' in block.text for item in updates for block in item.blocks)
     assert all(item['loaded'] and item['enabled'] for item in loaded['capabilities']['skills'])
 
     action(client, identity, 'skills_unload', name='project/review')

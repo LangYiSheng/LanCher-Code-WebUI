@@ -29,6 +29,7 @@ def saved_context_usage(state, transcript, provider_config):
         tools=[restore_tool(value) for value in tools.values()], allow_tool_calls=True,
         reasoning_effort=state.reasoning_effort, api_mode=provider_config.api_mode,
         experimental_mcp_tool_append=experimental, tool_updates=updates,
+        shared_system_count=prefix.get("shared_system_count", 0),
         prompt_cache_enabled=(experimental or prefix["protocol"] == "claude"
                               and urlsplit(provider_config.base_url).hostname == "api.anthropic.com"),
     )

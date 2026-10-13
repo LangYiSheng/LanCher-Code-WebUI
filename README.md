@@ -20,7 +20,7 @@
 .\.venv\Scripts\python.exe -m webui --port 8765
 ```
 
-`setup.ps1` 校验 `vendor/snapshot.json` 指定 wheel 的 SHA256，再同步 `requirements.lock.txt` 与前端锁文件。SDK 只安装 `vendor/wheels/current/` 的固定 wheel，不采用 editable 安装，也不从原仓库的未提交代码构建。 当前固定源码为 `f3329bc9bcc8b2ef7afd08cc80d3c9f85bcfd61b`，从已提交的 Git 归档在本项目忽略目录构建；SDK 版本仍为 0.1.0，安装脚本会只重装已校验的 SDK wheel，避免同版本快照没有更新。升级依赖前应先停止本项目服务，避免 Windows 锁定正在使用的扩展模块。
+`setup.ps1` 校验 `vendor/snapshot.json` 指定 wheel 的 SHA256，再同步 `requirements.lock.txt` 与前端锁文件。SDK 只安装 `vendor/wheels/current/` 的固定 wheel，不采用 editable 安装，也不从原仓库的未提交代码构建。 当前固定源码为 `f984bb72b46d8eff8d82d148782da83a62a3d308`，从已提交的 Git 归档在本项目忽略目录构建；SDK 版本仍为 0.1.0，安装脚本会只重装已校验的 SDK wheel，避免同版本快照没有更新。升级依赖前应先停止本项目服务，避免 Windows 锁定正在使用的扩展模块。
 
 ## 项目、任务与会话
 
@@ -60,7 +60,7 @@ MCP 按连接类型显示 stdio 环境变量或 HTTP 请求头，删除条目会
 
 归档记录集中在“数据与历史”，普通历史侧栏不显示归档开关。可按项目与关键词筛选，查看原生消息和工具记录；归档阅读页没有输入区、运行控制或检查器。显式恢复后，同一 Web 对话与 SDK UUID 回到历史侧栏，历史和工程文件不因查看或恢复而改变。固定 SDK 的原生归档标记仍保留，见上面的会话边界说明。
 
-“关于”分别显示 WebUI 应用版本与 LanCher Code SDK 版本：前者标识工作台自身，后者标识已安装的核心包；SDK 固定提交用于确认同版本包的源码来源，两者不混为一个版本号。当前 WebUI 为 0.2.0，SDK 为 0.1.0，固定来源为 f3329bc。
+“关于”分别显示 WebUI 应用版本与 LanCher Code SDK 版本：前者标识工作台自身，后者标识已安装的核心包；SDK 固定提交用于确认同版本包的源码来源，两者不混为一个版本号。当前 WebUI 为 0.3.0，SDK 为 0.1.0，固定来源为 f984bb7。
 
 模型发现使用当前填写的连接读取列表和能力信息，选中模型后先合并到设置草稿，显式保存才写共享配置。同源已有模型保留稳定 ID、显示名与手动覆盖；认证失败后旧结果不可继续导入，连接、作用范围和修订号变化也需要重新发现。
 

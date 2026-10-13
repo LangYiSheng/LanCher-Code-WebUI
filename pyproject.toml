@@ -1,6 +1,6 @@
 [project]
 name = "lancher-code-webui"
-version = "0.2.0"
+version = "0.3.0"
 description = "共用 LanCher Code SDK、配置和项目会话的本机 Web 工作台"
 requires-python = ">=3.14"
 dependencies = ["fastapi>=0.143,<1", "uvicorn>=0.54,<1", "lancher-code==0.1.0"]

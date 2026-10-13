@@ -1,15 +1,14 @@
 /* 搜索入口取代重复的侧栏收起按钮；折叠由工作台顶栏控制。 */
-.sidebar-search-button{display:inline-flex;width:28px;height:28px;flex-shrink:0}
+.sidebar-search-button{display:inline-flex;width:30px;height:30px;flex-shrink:0}
 .sidebar-collapsed .sidebar-search-button{display:none}
 .sidebar .new-chat-button kbd{font-size:10px;white-space:nowrap}
-.sidebar-section-heading{margin-top:14px}
 .chat-search-modal{max-width:600px;padding:23px}
 .chat-search-modal .modal-heading{margin-bottom:18px}
-.chat-search-input{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--canvas);color:var(--muted)}
+.chat-search-input{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-control);background:var(--canvas);color:var(--muted)}
 .chat-search-input input{flex:1;min-width:0;border:0;padding:0;background:transparent;outline:none;font-size:13px}
 .chat-search-input kbd{font-size:10px;flex-shrink:0}
 .chat-search-results{max-height:min(430px,55dvh);overflow:auto;margin:12px -5px 0;padding:2px 5px}
-.chat-search-result{display:flex;align-items:center;gap:12px;width:100%;min-width:0;padding:12px;border-radius:9px;text-align:left;color:var(--muted)}
+.chat-search-result{display:flex;align-items:center;gap:12px;width:100%;min-width:0;padding:12px;border-radius:var(--radius-control);text-align:left;color:var(--muted)}
 .chat-search-result:hover,.chat-search-result.selected{background:var(--surface-hover);color:var(--text)}
 .chat-search-result>span:first-of-type{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
 .chat-search-result strong{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}

@@ -2,6 +2,28 @@
 
 2026-10-12，新 LanCher Code WebUI 完成以下验证。旧 Agent Lab 的演示模型与 Docker 记录属于备份，没有用作本版本通过的依据。
 
+## 桌面标题栏、圆角与目录选择修正
+
+按用户要求，8765 经正常 `/api/shutdown` 返回 200 / closed=true，停止脚本已收尾，未重新启动浏览器服务。
+
+修正版 EXE 退出码 0，记录见 `data/desktop-build/frame-picker-frozen-check3/acceptance/result.json`：真实鼠标命中 `desktop-drag-area`，窗口移动 56 × 24 像素；客户区顶部和左侧非客户区缝隙均为 0；标题栏透明并共用底层背景；Windows 原生圆角偏好为 ROUND，完整窗口外缘截图实际可见圆角。原生文件夹选择器在 UI/STA 线程打开，经真实系统选择按钮返回专用验收目录，共享项目表单正确回填。原有窗口、托盘、单实例和 SDK 文件/Shell 验收仍通过。
+
+目录选择修复避免把冻结 EXE 当作 Python 子进程。新增目录适配、取消和失效目录边界，相关桌面与 legacy 回归 **10 passed，2.25 秒**；TypeScript/Vite 构建通过，桌面资源 `index-DHvpiHwr.js` / `index-Brlr9e5L.css`。鼠标测试只操作自己的测试窗口，按物理 DPI 坐标校验窗口归属并激活；完整窗口截图只截取自己的前台窗口范围。
+
+修正版已同步到原便携 EXE 与 ZIP 入口，旧包备份为 `data/desktop-build/desktop-before-frame-fix`。本次发现原默认桌面实例记录已不存在，未强制终止任何进程。桌面配置、项目登记与用户草稿数据保留。完整窗口图片见 `data/desktop-build/frame-picker-frozen-check3/acceptance/desktop-window.png`。
+
+## Windows 桌面便携预览
+
+桌面与浏览器共用前端和后端，新增独立窗口宿主；原 8765 返回 200，并继续提供 `index-CzjdmyyJ.js`，未覆盖其构建输出。桌面前端为 `index-4nPkzpSG.js` / `index-OfQ3Tm3a.css`，SDK wheel SHA256 复核一致，隔离记录见 `data/desktop-build/isolation-proof.json`。
+
+- 前端完整回归 **65 passed，353.6985 ms**，TypeScript 与 Vite 构建通过。新增导航 3 项、异步持久化 3 项，包括新旧草稿竞争、冻结写入和失败重试。
+- 后端完整回归 **68 passed，453.26 秒**。随后新增的跨端口状态持久化、外部页面宿主拒绝、损坏配置导入保护，连同桌面已有场景和 legacy 移除共 **8 passed，2.26 秒**。当前 71 项均有通过证据，未声称单次完整执行 71 项。只有既有 Starlette 弃用提示。
+- 最终冻结 EXE 专用模式退出码 **0**：真实 WebView2 中标题栏、无重复侧栏开关、前进后退、最大化/还原、最小化、托盘隐藏恢复、二次启动唤醒及原生截图均通过。测试使用 `data/desktop-build/final-frozen-smoke`，端口 51054；结束后关闭自己的后端和窗口。
+- 冻结包 SDK 使用注入 Provider，在独立 `acceptance/tool-project` 完成 3 个真实工具结果：文件写入、读取和 PowerShell 执行，Agent completed；外部模型请求为 0。原工程、真实模型配置没有参与自动化测试。
+- 截图来自 WebView2 原生 CapturePreviewAsync，保存于 `data/desktop-build/final-frozen-smoke/acceptance/desktop-about.png`；最终过程和发布校验见该目录 `result.json` 与 `data/desktop-build/release-proof.json`。
+
+交付为目录式便携 EXE 和 ZIP。安装器、无 WebView2 的干净系统、中文输入法、多屏 DPI、拖动贴靠和边缘缩放的人工体验仍待进一步验收，详见 [DESKTOP.md](DESKTOP.md)。
+
 ## 侧栏搜索、关于与实验入口清理
 
 侧栏顶端改为“搜索聊天”按钮，打开独立搜索弹窗；新建按钮明示 `Ctrl+N`，`Ctrl+K` 保留快速操作。正式侧栏与搜索排除归档和草稿，归档仍在设置中查看。搜索支持中文、全角字符、多关键词及项目/模型/Web/SDK 身份，按置顶、更新时间与 id 稳定排序。

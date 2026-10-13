@@ -1,3 +1,5 @@
+import {DesktopPersistence} from './desktopPersistence';
+import {isDesktop} from './desktopHost';
 import type { Dict } from './types';
 export class ApiError extends Error { status:number; data:Dict; constructor(message:string,status:number,data:Dict){super(message);this.status=status;this.data=data;} }
 export async function api<T=Dict>(path:string, options:RequestInit = {}):Promise<T> {
@@ -12,8 +14,10 @@ export async function api<T=Dict>(path:string, options:RequestInit = {}):Promise
 export const post=<T=Dict>(path:string,data:Dict={})=>api<T>(path,{method:'POST',body:JSON.stringify(data)});
 export const patch=<T=Dict>(path:string,data:Dict={})=>api<T>(path,{method:'PATCH',body:JSON.stringify(data)});
 export const remove=(path:string)=>api(path,{method:'DELETE'});
-export function readLocal<T>(key:string,fallback:T):T {try{const value=localStorage.getItem(`lancher-webui:${key}`);return value?JSON.parse(value):fallback;}catch{return fallback;}}
-export function writeLocal(key:string,value:unknown){try{localStorage.setItem(`lancher-webui:${key}`,JSON.stringify(value));}catch{/* 无存储权限时保留内存内状态。 */}}
+export function readLocal<T>(key:string,fallback:T):T {if(isDesktop()){const value=window.__LANCHER_UI_STATE__?.[key];return value===undefined?fallback:value as T;}try{const value=localStorage.getItem(`lancher-webui:${key}`);return value?JSON.parse(value):fallback;}catch{return fallback;}}
+const desktopStorage=new DesktopPersistence(async body=>{const response=await fetch('/desktop/ui-state',{method:'POST',headers:{'Content-Type':'application/json'},body});if(!response.ok)throw new Error('桌面草稿保存失败，请稍后重试。');});
+export const flushDesktopStorage=()=>desktopStorage.flush();
+export function writeLocal(key:string,value:unknown){if(isDesktop()){window.__LANCHER_UI_STATE__={...window.__LANCHER_UI_STATE__,[key]:value};desktopStorage.write(key,value);return;}try{localStorage.setItem(`lancher-webui:${key}`,JSON.stringify(value));}catch{/* 无存储权限时保留内存内状态。 */}}
 export const isBusy=(status?:string)=>['queued','starting','running','compacting','waiting_permission','stopping','busy'].includes(status||'');
 export const statusLabel=(status?:string)=>({idle:'准备就绪',starting:'正在启动',compacting:'压缩上下文',queued:'排队中',running:'正在工作',waiting_permission:'等待审批',stopping:'正在收尾',completed:'已完成',failed:'失败',cancelled:'已停止',busy:'会话已被占用',interrupted:'已中断'}[status||'']||status||'准备就绪');
 export const phaseLabel=(phase?:string)=>({discuss:'讨论',plan:'计划',execute:'执行'}[phase||'']||phase||'执行');

@@ -65,7 +65,7 @@ class Owner:
 
 
 class AppManager:
-    def __init__(self,root,user_home=None,provider_factory=None,enable_mcp=True):
+    def __init__(self,root,user_home=None,provider_factory=None,enable_mcp=True,resource_root=None):
         self.root=Path(root).resolve();self.data=self.root/'data'
         self.user_home=Path(user_home or Path.home())
         self.configuration=ConfigurationService(self.root,user_home=self.user_home)
@@ -79,7 +79,7 @@ class AppManager:
         self.snapshot_cache={};self.server_id=uuid4().hex;self.signal=asyncio.Event()
         self.closing=False;self.closed=False;self.maintenance=None
         self.shutdown_callback=None
-        self.sdk_snapshot=json.loads((self.root/'vendor/snapshot.json').read_text(encoding='utf-8-sig'))
+        self.sdk_snapshot=json.loads((Path(resource_root or self.root)/'vendor/snapshot.json').read_text(encoding='utf-8-sig'))
 
     async def start(self):
         for chat in self.chats.values():

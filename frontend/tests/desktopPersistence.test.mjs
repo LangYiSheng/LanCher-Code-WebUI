@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {DesktopPersistence} from '../src/desktopPersistence.ts';
+test('旧请求回执不会丢掉同键的新草稿',async()=>{let release;const gate=new Promise(resolve=>release=resolve);const saved=[];const store=new DesktopPersistence(async body=>{saved.push(JSON.parse(body));if(saved.length===1)await gate;});store.write('draft','旧');await new Promise(resolve=>setImmediate(resolve));store.write('draft','新');release();await store.flush();assert.deepEqual(saved.map(x=>x.value),['旧','新']);});
+test('保存失败保留草稿，退出前刷新可重试恢复',async()=>{let failed=true;const saved=[];const store=new DesktopPersistence(async body=>{if(failed)throw new Error('断线');saved.push(JSON.parse(body));});store.write('draft','待保存');await assert.rejects(store.flush(),/断线/);failed=false;await store.flush();assert.deepEqual(saved,[{key:'draft',value:'待保存'}]);});
+test('写入冻结为当时快照，多个键都能落盘',async()=>{const saved=[];const store=new DesktopPersistence(async body=>{saved.push(JSON.parse(body));});const draft={text:'原内容'};store.write('draft',draft);draft.text='后来变化';store.write('panel',{width:480});await store.flush();assert.deepEqual(saved,[{key:'draft',value:{text:'原内容'}},{key:'panel',value:{width:480}}]);});

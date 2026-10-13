@@ -1,6 +1,6 @@
 import type {CSSProperties} from 'react';
 import {
-  Activity, Archive, ArrowLeft, ArrowUp, BookOpen, Check, ChevronDown,
+  Activity, Archive, ArrowLeft, ArrowRight, ArrowUp, Minus, SquareStack, BookOpen, Check, ChevronDown,
   ChevronRight, CircleHelp, Clock, CodeXml, Command, Copy, File, FilePenLine,
   FileSearch, FileText, FileX, Folder, FolderSearch, Globe, History,
   Info, Keyboard, Layers, List, ListTodo, LogOut, Logs, Menu, MessageSquare, Monitor, Moon, MoreHorizontal,
@@ -17,7 +17,7 @@ const icons:Record<string,LucideIcon>={
   copy:Copy,code:CodeXml,terminal:Terminal,file:File,activity:Activity,
   moon:Moon,sun:Sun,monitor:Monitor,shield:ShieldCheck,archive:Archive,
   pin:Pin,refresh:RefreshCw,link:Plug,history:History,command:Command,
-  edit:Pencil,trash:Trash2,back:ArrowLeft,globe:Globe,spark:Sparkles,
+  minimize:Minus,maximize:Square,restore:SquareStack,forward:ArrowRight,edit:Pencil,trash:Trash2,back:ArrowLeft,globe:Globe,spark:Sparkles,
   menu:Menu,info:Info,read:FileText,write:FilePenLine,delete:FileX,
   glob:FolderSearch,grep:FileSearch,plan:ListTodo,skill:BookOpen,
   process:Terminal,process_list:List,process_read:Logs,process_wait:Clock,

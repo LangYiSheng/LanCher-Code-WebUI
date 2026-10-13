@@ -9,7 +9,7 @@ from typing import Literal
 
 from fastapi import FastAPI,Query,Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse,JSONResponse,StreamingResponse,HTMLResponse
+from fastapi.responses import FileResponse,JSONResponse,StreamingResponse,HTMLResponse,Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel,ConfigDict,Field,field_validator
 
@@ -71,12 +71,12 @@ class CommandBody(Body):
     confirmed:bool=False
 
 
-def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=None,enable_mcp=True):
+def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=None,enable_mcp=True,*,runtime_root:Path|None=None,desktop:bool=False,desktop_state:dict|None=None):
     root=Path(root or os.environ.get('LANCHER_WEBUI_ROOT',Path(__file__).resolve().parent.parent)).resolve()
 
     @asynccontextmanager
     async def lifespan(app):
-        manager=AppManager(root,user_home=user_home,provider_factory=provider_factory,enable_mcp=enable_mcp)
+        manager=AppManager(runtime_root or root,user_home=user_home,provider_factory=provider_factory,enable_mcp=enable_mcp,resource_root=root)
         manager.shutdown_callback=getattr(app.state,'shutdown_callback',None)
         app.state.manager=manager
         app.state.discovery=DiscoveryService(manager.configuration)
@@ -136,7 +136,9 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
     async def project(body:ProjectBody,request:Request):return await manager(request).add_project(body.path,body.name)
 
     @app.post('/api/projects/pick')
-    async def pick():return await pick_directory()
+    async def pick(request:Request):
+        picker=getattr(request.app.state,'directory_picker',None)
+        return await asyncio.to_thread(picker) if picker else await pick_directory()
 
     @app.patch('/api/projects/{project_id}')
     async def patch_project(project_id:str,body:dict,request:Request):return await manager(request).patch_project(project_id,body)
@@ -257,10 +259,17 @@ def create_app(root:Path|None=None,user_home:Path|None=None,provider_factory=Non
                      for route in app.routes if route.path.startswith('/api/'))
         return '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>LanCher Code WebUI API</title><style>body{font:16px system-ui;margin:48px;color:#222}td{padding:9px 24px 9px 0;border-bottom:1px solid #ddd}a{color:#2464d0}</style><h1>LanCher Code WebUI API</h1><p>本机单 worker · 原生 SDK 工具 · <a href="/openapi.json">完整 OpenAPI JSON</a> · <a href="/">返回工作台</a></p><table>'+rows+'</table></html>'
 
+    if desktop:
+        @app.get('/desktop-host.js')
+        async def desktop_host():
+            return Response('window.__LANCHER_DESKTOP__=true;window.__LANCHER_UI_STATE__='+json.dumps(desktop_state or {},ensure_ascii=False)+';',media_type='application/javascript',headers={'Cache-Control':'no-store'})
+
     @app.get('/')
     async def index():
         path=root/'frontend/dist/index.html'
         if not path.is_file():return JSONResponse({'detail':'前端尚未构建，请运行 setup.ps1。'},503)
+        if desktop:
+            return HTMLResponse(path.read_text(encoding="utf-8").replace("</head>",'<script src="/desktop-host.js"></script></head>'))
         return FileResponse(path)
 
     app.mount('/assets',StaticFiles(directory=root/'frontend/dist/assets',check_dir=False),name='assets')

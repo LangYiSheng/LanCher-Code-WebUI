@@ -87,3 +87,7 @@ $env:PYTHONDONTWRITEBYTECODE='1'
 - `data/legacy/data/`：保留在磁盘的旧实验数据备份，产品不提供入口或读取接口。
 
 旧 `D:\Dev\LanCher Agent Lab` 保留为历史磁盘备份；旧实验历史入口和读取链已从本产品移除，旧后端和前端不作为运行入口。原 `D:\Dev\LanCher Code` 保持独立，本项目不写其代码、依赖环境或 Git 状态。
+
+## Windows 桌面预览
+
+桌面版共用本项目界面与 SDK，使用独立端口、配置与数据目录。便携 EXE、构建步骤和验收边界见 [DESKTOP.md](DESKTOP.md)。当前浏览器版启动方式与 8765 服务保留。

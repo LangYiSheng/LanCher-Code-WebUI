@@ -1,9 +1,9 @@
 {
   "wheel": "vendor/wheels/current/lancher_code-0.1.0-py3-none-any.whl",
-  "wheel_sha256": "d9a79a6e64f60c539e354107dea51f72b904a11a74831844739af7323a1cdb70",
+  "wheel_sha256": "b4e6ea52b04eaf39a54f867c2a96a7021aa43c09255b852d149bf84cc7a5bb3f",
   "legacy_source": "D:\\Dev\\LanCher Agent Lab",
-  "commit": "f3329bc9bcc8b2ef7afd08cc80d3c9f85bcfd61b",
+  "commit": "f984bb72b46d8eff8d82d148782da83a62a3d308",
   "source_repository": "D:\\Dev\\LanCher Code",
-  "source_method": "git archive fixed committed source; built only in ignored WebUI vendor/sdk-f3329bc",
-  "source_archive_sha256": "63ac96c309a098059dfe97bfd9c29317fb74ead1380bca3a60f82c9de90ecbc7"
+  "source_method": "git archive fixed committed source; built only in ignored WebUI vendor/sdk-f984bb7",
+  "source_archive_sha256": "f9d2e28f30e34257e7cfc1ad7d46b2b9ad77d1ee410f69cdc67ce9e5707b42fc"
 }
